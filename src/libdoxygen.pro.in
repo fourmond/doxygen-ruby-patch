@@ -215,6 +215,7 @@ SOURCES      =	ce_lex.cpp \
 		pre.cpp \
 		pycode.cpp \
 		pyscanner.cpp \    
+		rubyscanner.cpp \    
 		qhp.cpp \
 		qhpxmlwriter.cpp \
 		reflist.cpp \

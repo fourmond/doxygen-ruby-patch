@@ -67,6 +67,7 @@
 #include "parserintf.h"
 #include "htags.h"
 #include "pyscanner.h"
+#include "rubyscanner.h"
 #include "fortranscanner.h"
 #include "dbusxmlscanner.h"
 #include "code.h"

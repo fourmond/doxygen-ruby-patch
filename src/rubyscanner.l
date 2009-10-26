@@ -1648,7 +1648,11 @@ void RubyLanguageScanner::parsePrototype(const char *text)
 
 void RubyLanguageScanner::resetCodeParserState()
 {
-  ::resetPythonCodeParserState();
+  
+  // ::resetRubyCodeParserState();
+  /** 
+      \todo Write a code scanner, when I know how to write one.
+  */
 }
 
 //----------------------------------------------------------------------------
