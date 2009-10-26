@@ -9043,6 +9043,7 @@ void initDoxygen()
   Doxygen::parserManager = new ParserManager;
   Doxygen::parserManager->registerParser("c",       new CLanguageScanner, TRUE);
   Doxygen::parserManager->registerParser("python",  new PythonLanguageScanner);
+  Doxygen::parserManager->registerParser("ruby",    new RubyLanguageScanner);
   Doxygen::parserManager->registerParser("fortran", new FortranLanguageScanner);
   Doxygen::parserManager->registerParser("vhdl",    new VHDLLanguageScanner);
   Doxygen::parserManager->registerParser("dbusxml", new DBusXMLScanner);

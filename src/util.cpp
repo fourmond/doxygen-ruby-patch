@@ -6438,6 +6438,7 @@ g_lang2extMap[] =
   { "c",           "c",       SrcLangExt_Cpp    },
   { "c++",         "c",       SrcLangExt_Cpp    },
   { "python",      "python",  SrcLangExt_Python },
+  { "ruby",        "ruby",    SrcLangExt_Ruby   },
   { "fortran",     "fortran", SrcLangExt_F90    },
   { "vhdl",        "vhdl",    SrcLangExt_VHDL   },
   { "dbusxml",     "dbusxml", SrcLangExt_XML    },
@@ -6499,6 +6500,7 @@ void initDefaultExtensionMapping()
   updateLanguageMapping(".M",     "objective-c");
   updateLanguageMapping(".mm",    "objective-c");
   updateLanguageMapping(".py",    "python");
+  updateLanguageMapping(".rb",    "ruby");
   updateLanguageMapping(".f",     "fortran");
   updateLanguageMapping(".f90",   "fortran");
   updateLanguageMapping(".vhd",   "vhdl");
