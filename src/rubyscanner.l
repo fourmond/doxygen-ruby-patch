@@ -414,12 +414,14 @@ NUMBER            {DIGIT}+[lLjJ]?
 INTNUMBER         {HEXNUMBER}|{OCTNUMBER}|{NUMBER}
 FLOATNUMBER       {DIGIT}+"."{DIGIT}+([eE][+\-]?{DIGIT}+)?[jJ]?
 LETTER            [A-Za-z]
+CAPITAL           [A-Z]
 NONEMPTY          [A-Za-z0-9_]
 EXPCHAR           [#(){}\[\],:.%/\\=`*~|&<>!;+-]
 NONEMPTYEXP       [^ \t\n:]
 PARAMNONEMPTY     [^ \t\n():]
-IDENTIFIER        ({LETTER}|"_")({LETTER}|{DIGIT}|"_")*  
-SCOPE             {IDENTIFIER}("."{IDENTIFIER})*
+CLASSNAME         {CAPITAL}({LETTER}|{DIGIT}|"_")*
+IDENTIFIER        ({LETTER}|"_")({LETTER}|{DIGIT}|"_")*([?!]|{B}=)?
+SCOPE             {IDENTIFIER}("(::\.)"{IDENTIFIER})*
 BORDER            ([^A-Za-z0-9])
 
 TRISINGLEQUOTE    "'''"(!)?
@@ -523,17 +525,6 @@ STARTDOCSYMS      ^{B}"##"/[^#]
 			  g_packageCommentAllowed = FALSE;
 
 			  BEGIN( ClassDec ) ;
-                       }
-     ^{B}"from"{BB}    |
-     "from"{BB}	       { // start of an from import
-			  g_packageCommentAllowed = FALSE;
-                          BEGIN( FromMod );
-                       }
-
-     ^{B}"import"{BB}  |
-     "import"{BB}      { // start of an import statement
-			  g_packageCommentAllowed = FALSE;
-                          BEGIN( Import );
                        }
      ^{B}{IDENTIFIER}/{B}"="{B}"property" { // property
       			current->section   = Entry::VARIABLE_SEC;
@@ -658,29 +649,6 @@ STARTDOCSYMS      ^{B}"##"/[^#]
                 }
 }
 
-<Import>{
-  {IDENTIFIER}({B}"."{B}{IDENTIFIER})* {
-			current->name=removeRedundantWhiteSpace(substitute(yytext,".","::"));
-			current->fileName = yyFileName; 
-			//printf("Adding using declaration: found:%s:%d name=%s\n",yyFileName.data(),yyLineNr,current->name.data());
-			current->section=Entry::USINGDECL_SEC;
-			current_root->addSubEntry(current);
-			current = new Entry ;
-			initEntry();
-			BEGIN(Search);
-                      }
-  \n		{
-                  yyLineNr++;
-                  BEGIN(Search);
-                }
-  {B}		{
-		}
-  .             {
-                  unput(*yytext);
-                  BEGIN(Search);
-                }
-}
-
 <SearchMemVars>{
     "self."{IDENTIFIER}/{B}"=" {
                         //printf("Found member variable %s in %s\n",&yytext[5],current_root->name.data());
@@ -775,15 +743,10 @@ STARTDOCSYMS      ^{B}"##"/[^#]
     ^{BB}/\n	      { // skip empty line
       		        current->program+=yytext;
       	              }
-    ^{BB}	      { // something at indent >0
+    ^{BB}"end"	      { // something at indent >0
       		        current->program+=yytext;
-			g_curIndent = computeIndent(yytext);
-                        if (g_curIndent<=g_indent) 
-			  // jumped out of the function
-			{
-			  endOfDef();
-                          BEGIN(Search);
-			}
+			endOfDef();
+                        BEGIN(Search);
       		      }
     "'"	              { // start of a single quoted string
       		        current->program+=yytext;
@@ -839,6 +802,7 @@ STARTDOCSYMS      ^{B}"##"/[^#]
 <FunctionDec>{
 
     {IDENTIFIER}            {
+             		      printf("Found function %s\n", yytext);
 			      //found function name
 			      if (current->type.isEmpty()) 
 			      {
@@ -848,7 +812,7 @@ STARTDOCSYMS      ^{B}"##"/[^#]
 			      current->name = current->name.stripWhiteSpace();
 			      newFunction();
                             }
-    {B}":"		    { // function without arguments
+    {B}\n		    { // function without arguments
 			      g_specialBlock = TRUE; // expecting a docstring
 			      bodyEntry = current;
                               BEGIN( FunctionBody );
@@ -1008,7 +972,7 @@ STARTDOCSYMS      ^{B}"##"/[^#]
                       }
 }
 
-<ClassDec>{IDENTIFIER} {
+<ClassDec>{CLASSNAME} {
 			  if (current->type.isEmpty()) 
 			  {
 			      current->type = "class";
@@ -1016,10 +980,12 @@ STARTDOCSYMS      ^{B}"##"/[^#]
 
 			  current->section = Entry::CLASS_SEC;
 			  current->name = yytext;
+    		          printf("Class: %s\n", yytext);
 
 			  // prepend scope in case of nested classes
 			  if (current_root->section&Entry::SCOPE_MASK)
 			  {
+                            // todo: make things work here...
 			    //printf("*** Prepending scope %s to class %s\n",current_root->name.data(),current->name.data());
 			    current->name.prepend(current_root->name+"::");
 			  }
@@ -1035,60 +1001,23 @@ STARTDOCSYMS      ^{B}"##"/[^#]
                         }
 
 <ClassInheritance>{
-   ({BB}|[\(,\)])      { // syntactic sugar for the list
+   {B}<      { // syntactic sugar for the list
                        }
 
-    ":"                { // begin of the class definition
-			 g_specialBlock = TRUE; // expecting a docstring
-      			 BEGIN(ClassCaptureIndent);
-                       }
 
     {SCOPE}            {
+    		         printf("Inheritance: %s\n", yytext);
                          current->extends->append(
 					      new BaseInfo(substitute(yytext,".","::"),Public,Normal)
 					    );
                          //Has base class-do stuff
                        }
+    "."|\n                { // begin of the class definition
+			 g_specialBlock = TRUE; // expecting a docstring
+      			 BEGIN(Search);
+                       }
 }
 
-
-<ClassCaptureIndent>{
-    "\n"|({BB}"\n")            {
-                                 // Blankline - ignore, keep looking for indentation.
-				 lineCount();
-                               }
-
-    {TRIDOUBLEQUOTE}           { // start of a comment block
-				 initTriDoubleQuoteBlock();
-			 	 BEGIN(TripleComment);
-                      	       }
-
-    {TRISINGLEQUOTE}           { // start of a comment block
-			         initTriSingleQuoteBlock();
-			         BEGIN(TripleComment);
-                               }
-
-    ^{BB} 		       {
-      				 current->program=yytext;
-			         current->startLine = yyLineNr;
-				 g_curIndent=computeIndent(yytext);
-				 bodyEntry = current;
-				 //fprintf(stderr,"setting indent %d\n",g_curIndent);
-				 //printf("current->program=[%s]\n",current->program.data());
-				 g_hideClassDocs = TRUE;
-			         BEGIN(ClassBody);
-                               }
-
-    ""/({NONEMPTY}|{EXPCHAR})  {
-				 
-				 // Just pushback an empty class, and
-				 // resume parsing the body.
-                                 newEntry();
-
-				 // printf("Failed to find indent - skipping!");
-				 BEGIN( Search );
-                               }
-}
 
 
 <VariableDec>{
