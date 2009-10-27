@@ -21,6 +21,10 @@
  *  taught by Peter H. Froehlich <phf@acm.org>.
  */
 
+/* 
+  Here, I must probably rewrite everything from scratch !
+*/
+
 
 %{
 
@@ -100,7 +104,6 @@ static int              g_atomCount;
 
 //static bool             g_insideConstructor;
 
-static QCString         g_moduleScope;
 static QCString         g_packageName;
 
 static bool             g_hideClassDocs;
@@ -160,16 +163,7 @@ static void newVariable()
 
 static void newFunction()
 {
-  if (current->name.left(2)=="__" && current->name.right(2)=="__")
-  {
-    // special method name, see
-    // http://docs.python.org/ref/specialnames.html
-    current->protection=Public;
-  }
-  else if (current->name.at(0)=='_')
-  {
-    current->protection=Private;
-  }
+	//
 }
 
 static inline int computeIndent(const char *s)
@@ -419,10 +413,14 @@ NONEMPTY          [A-Za-z0-9_]
 EXPCHAR           [#(){}\[\],:.%/\\=`*~|&<>!;+-]
 NONEMPTYEXP       [^ \t\n:]
 PARAMNONEMPTY     [^ \t\n():]
-CLASSNAME         {CAPITAL}({LETTER}|{DIGIT}|"_")*
-IDENTIFIER        ({LETTER}|"_")({LETTER}|{DIGIT}|"_")*([?!]|{B}=)?
+CONSTNAME         {CAPITAL}({LETTER}|{DIGIT}|"_")*
+FUNCNAME          ({LETTER}|"_")({LETTER}|{DIGIT}|"_")*([?!]|{B}=)?
+IDENTIFIER        ({LETTER}|"_")({LETTER}|{DIGIT}|"_")*
 SCOPE             {IDENTIFIER}("(::\.)"{IDENTIFIER})*
 BORDER            ([^A-Za-z0-9])
+
+/* end of statement */
+EOS    	  	  {B}[;\n]{B}  
 
 TRISINGLEQUOTE    "'''"(!)?
 TRIDOUBLEQUOTE    "\"\"\""(!)?
@@ -496,7 +494,6 @@ STARTDOCSYMS      ^{B}"##"/[^#]
 
     ^{B}"def"{BB}       |
     "def"{BB}           { // start of a function/method definition
-      			  g_indent=computeIndent(yytext);
 			  current->fileName  = yyFileName;
 			  current->startLine = yyLineNr;
 			  current->bodyLine  = yyLineNr;
@@ -514,38 +511,16 @@ STARTDOCSYMS      ^{B}"##"/[^#]
 			  BEGIN( FunctionDec );
                        }
 
-     ^{B}"class"{BB}	|
-     "class"{BB}        {  // start of a class definition
-      			  g_indent=computeIndent(yytext);
+     ^{B}(module|class){BB}	|
+     (module|class){BB} {  // start of a class definition
 			  current->section = Entry::CLASS_SEC;
 			  current->argList->clear();
-			  current->type += "class" ;
+			  current->type = QCString(yytext).stripWhiteSpace();
 			  current->fileName  = yyFileName;
 			  current->bodyLine  = yyLineNr;
 			  g_packageCommentAllowed = FALSE;
-
 			  BEGIN( ClassDec ) ;
                        }
-     ^{B}{IDENTIFIER}/{B}"="{B}"property" { // property
-      			current->section   = Entry::VARIABLE_SEC;
-  			current->mtype     = Property;
-			current->name      = QCString(yytext).stripWhiteSpace();
-			current->fileName  = yyFileName;
-			current->startLine = yyLineNr;
-			current->bodyLine  = yyLineNr;
-			g_packageCommentAllowed = FALSE;
-			BEGIN(VariableDec);
-       	              }
-     ^{B}{IDENTIFIER}/{B}"="[^=] { // variable
-      			g_indent=computeIndent(yytext);
-      			current->section   = Entry::VARIABLE_SEC;
-			current->name      = QCString(yytext).stripWhiteSpace();
-			current->fileName  = yyFileName;
-			current->startLine = yyLineNr;
-			current->bodyLine  = yyLineNr;
-			g_packageCommentAllowed = FALSE;
-			BEGIN(VariableDec);
-      		      }
      "'"	      { // start of a single quoted string
        		        g_stringContext=YY_START;
 		        g_copyString=0;
@@ -576,16 +551,6 @@ STARTDOCSYMS      ^{B}"##"/[^#]
 
     {NEWLINE}+        { // new line
                         lineCount();
-                      }
-
-    {TRIDOUBLEQUOTE}  { // start of a comment block
-			initTriDoubleQuoteBlock();
-			BEGIN(TripleComment);
-                      }
-
-    {TRISINGLEQUOTE}  { // start of a comment block
-			initTriSingleQuoteBlock();
-			BEGIN(TripleComment);
                       }
 
     {STARTDOCSYMS}    {  // start of a special comment
@@ -649,54 +614,6 @@ STARTDOCSYMS      ^{B}"##"/[^#]
                 }
 }
 
-<SearchMemVars>{
-    "self."{IDENTIFIER}/{B}"=" {
-                        //printf("Found member variable %s in %s\n",&yytext[5],current_root->name.data());
-			current->name=&yytext[5];
-			current->section=Entry::VARIABLE_SEC;
-			current->fileName  = yyFileName;
-			current->startLine = yyLineNr;
-			current->bodyLine  = yyLineNr;
-			current->type.resize(0);
-			if (current->name.at(0)=='_') // mark as private
-			{
-			  current->protection=Private;
-			}
-			else
-			{
-			  current->protection=Public;
-			}
-			newEntry();
-                      }
-    {TRIDOUBLEQUOTE}  { // start of a comment block
-			initTriDoubleQuoteBlock();
-			BEGIN(TripleComment);
-                      }
-
-    {TRISINGLEQUOTE}  { // start of a comment block
-			initTriSingleQuoteBlock();
-			BEGIN(TripleComment);
-                      }
-
-    {STARTDOCSYMS}    {  // start of a special comment
-			initSpecialBlock();
-			BEGIN(SpecialComment);
-                      }
-    {POUNDCOMMENT}    { // #
-	              }
-    "'"	              { // start of a single quoted string
-       			g_stringContext=YY_START;
-			g_copyString=0;
-                        BEGIN( SingleQuoteString );
-                      }
-    "\""              { // start of a double quoted string
-       			g_stringContext=YY_START;
-			g_copyString=0;
-                        BEGIN( DoubleQuoteString );
-                      }
-    \n		      { yyLineNr++; }
-    .                 // anything else
-}
 
 <FunctionBody>{
     \n{B}/{IDENTIFIER}{BB}  {
@@ -801,7 +718,7 @@ STARTDOCSYMS      ^{B}"##"/[^#]
 
 <FunctionDec>{
 
-    {IDENTIFIER}            {
+    {FUNCNAME}            {
              		      printf("Found function %s\n", yytext);
 			      //found function name
 			      if (current->type.isEmpty()) 
@@ -846,7 +763,7 @@ STARTDOCSYMS      ^{B}"##"/[^#]
      ")"                { // end of parameter list
                         }
 
-     ":"{B}             {
+     {EOS}             {
 			  g_specialBlock = TRUE; // expecting a docstring
 			  bodyEntry = current;
                           BEGIN( FunctionBody );
@@ -890,7 +807,7 @@ STARTDOCSYMS      ^{B}"##"/[^#]
 
 
 <ClassBody>{
-    \n/{IDENTIFIER}{BB}  { // new def at indent 0
+    {B}"end"{B}  { // end of class
                         yyLineNr++;
 			endOfDef();
 			g_hideClassDocs = FALSE;
@@ -910,24 +827,6 @@ STARTDOCSYMS      ^{B}"##"/[^#]
     <<EOF>>	      {
 			endOfDef();
 			yyterminate();
-      		      }
-    ^{BB}	      { // something at indent >0
-                        g_curIndent=computeIndent(yytext);
-			//fprintf(stderr,"g_curIndent=%d g_indent=%d\n",g_curIndent,g_indent);
-                        if (g_curIndent<=g_indent) 
-			  // jumped out of the class
-			{
-			  endOfDef();
-			  g_indent=g_curIndent;
-			  // make sure the next rule matches ^...
-			  YY_CURRENT_BUFFER->yy_at_bol=TRUE;
-			  g_hideClassDocs = FALSE;
-                          BEGIN(Search);
-			}
-			else
-			{
-      		          current->program+=yytext;
-			}
       		      }
     "'"	              { // start of a single quoted string
       		        current->program+=*yytext;
@@ -972,15 +871,10 @@ STARTDOCSYMS      ^{B}"##"/[^#]
                       }
 }
 
-<ClassDec>{CLASSNAME} {
-			  if (current->type.isEmpty()) 
-			  {
-			      current->type = "class";
-			  }
-
+<ClassDec>{CONSTNAME} {
 			  current->section = Entry::CLASS_SEC;
 			  current->name = yytext;
-    		          printf("Class: %s\n", yytext);
+    		          printf("%s: %s\n", (const char *)current->type, yytext);
 
 			  // prepend scope in case of nested classes
 			  if (current_root->section&Entry::SCOPE_MASK)
@@ -991,6 +885,9 @@ STARTDOCSYMS      ^{B}"##"/[^#]
 			  }
 			  
 			  current->name = current->name.stripWhiteSpace();
+    		          printf("-> %s: %s\n", 
+			  	 (const char *)current->type,
+				 (const char *)current->name);
 			  current->fileName = yyFileName;        
 			  docBlockContext   = YY_START;
 			  docBlockInBody    = FALSE;
@@ -1007,14 +904,12 @@ STARTDOCSYMS      ^{B}"##"/[^#]
 
     {SCOPE}            {
     		         printf("Inheritance: %s\n", yytext);
-                         current->extends->append(
-					      new BaseInfo(substitute(yytext,".","::"),Public,Normal)
-					    );
-                         //Has base class-do stuff
+                         current->extends->clear();
+                         current->extends->append(new BaseInfo(substitute(yytext,".","::"),Public,Normal));
                        }
-    "."|\n                { // begin of the class definition
+    {EOS}              { // begin of the class definition
 			 g_specialBlock = TRUE; // expecting a docstring
-      			 BEGIN(Search);
+			 BEGIN(ClassBody);
                        }
 }
 
@@ -1188,7 +1083,7 @@ STARTDOCSYMS      ^{B}"##"/[^#]
 			        actualDoc.prepend("\\verbatim ");
 			        actualDoc.append("\\endverbatim ");
 			      }
-			      actualDoc.prepend("\\namespace "+g_moduleScope+"\\_linebr ");
+ //			      actualDoc.prepend("\\namespace "+g_moduleScope+"\\_linebr ");
 			      handleCommentBlock(actualDoc, FALSE);
 			    }
 			    if ((docBlockContext==ClassBody && !g_hideClassDocs) ||
@@ -1429,19 +1324,10 @@ static void parseMain(const char *fileName,const char *fileBuf,Entry *rt)
     msg("Parsing file %s...\n",yyFileName.data());
 
     QFileInfo fi(fileName);
-    g_moduleScope = findPackageScope(fileName);
     QString baseName=fi.baseName();
-    if (baseName!="__init__") // package initializer file is not a package itself
-    {
-      if (!g_moduleScope.isEmpty())
-      {
-	g_moduleScope+="::";
-      }
-      g_moduleScope+=baseName;
-    }
 
     current            = new Entry;
-    current->name      = g_moduleScope;
+    current->name      = "";
     current->section   = Entry::NAMESPACE_SEC;
     current->type      = "namespace";
     current->fileName  = yyFileName;
