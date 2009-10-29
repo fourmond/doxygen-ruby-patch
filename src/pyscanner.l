@@ -500,7 +500,7 @@ STARTDOCSYMS      ^{B}"##"/[^#]
 			  current->startLine = yyLineNr;
 			  current->bodyLine  = yyLineNr;
 			  current->section = Entry::FUNCTION_SEC;
-			  current->protection = protection = Public;
+			  current->protection = Public;
 			  current->objc = FALSE;
 			  current->virt = Normal;
 			  current->stat = FALSE;
