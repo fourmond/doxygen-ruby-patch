@@ -85,6 +85,9 @@ static Specifier 	virt;
 
 static QCString 	g_namespace_kind;
 
+/* stuff for slurping ;-)...*/
+static int              g_nesting_level = 0;
+
 
 static int              docBlockContext;
 static QCString         docBlock;
@@ -215,7 +218,9 @@ static void leaveNamespace()
   if(current_root != global_root)
     current_root = current_root->parent();
   else {
-    fprintf(stderr, "Warning: attempting to end root namespace\n");
+    fprintf(stderr, "Warning: attempting to end root namespace at %s:"
+    "%d\n\%s\n",
+            (const char*)yyFileName,yyLineNr, yytext);
   }
 }
 
@@ -324,31 +329,20 @@ static void appendDocBlock() {
 
 static void handleCommentBlock(const QCString &doc,bool brief)
 {
-  //printf("handleCommentBlock(doc=[%s] brief=%d docBlockInBody=%d docBlockJavaStyle=%d\n",
-  //    doc.data(),brief,docBlockInBody,docBlockJavaStyle);
-
-  // TODO: Fix me
-  docBlockInBody=FALSE;
-  
-  if (docBlockInBody && previous && !previous->doc.isEmpty())
-  {
-    previous->doc=previous->doc.stripWhiteSpace()+"\n\n";
-  }
-
+  printf("handling special comment: %s\n", (const char *) doc);
   int position = 0;
   bool needsEntry;
-  while (parseCommentBlock(
-	g_thisParser,
-	(docBlockInBody && previous) ? previous : current,
-	doc,     // text
-	yyFileName, // file
-	brief ? current->briefLine : current->docLine,   // line of block start
-	docBlockInBody ? FALSE : brief, 
-    docBlockJavaStyle, // javadoc style // or FALSE,
-	docBlockInBody,
-	protection,
-        position,
-        needsEntry)
+  while (parseCommentBlock(g_thisParser,
+	  (docBlockInBody && previous) ? previous : current,
+	  doc,     // text
+	  yyFileName, // file
+	  brief ? current->briefLine : current->docLine,   // line of block start
+	  docBlockInBody ? FALSE : brief, 
+          docBlockJavaStyle, // javadoc style // or FALSE,
+	  docBlockInBody,
+	  protection,
+          position,
+          needsEntry)
      ) // need to start a new entry
   {
     if (needsEntry)
@@ -360,7 +354,6 @@ static void handleCommentBlock(const QCString &doc,bool brief)
   {
     newEntry();
   }
-
 }
 
 static void endOfDef()
@@ -403,6 +396,7 @@ static void initTriSingleQuoteBlock()
 
 static void initSpecialBlock()
 {
+  printf("Initializing special block !\n");
   docBlockContext   = YY_START;
   docBlockInBody    = FALSE;
   docBlockJavaStyle = TRUE;
@@ -458,27 +452,13 @@ IDENTIFIER        ({LETTER}|"_")({LETTER}|{DIGIT}|"_")*
 SCOPE             {IDENTIFIER}("(::\.)"{IDENTIFIER})*
 BORDER            ([^A-Za-z0-9])
 
-/* end of statement */
+      /* end of statement */
 EOS    	  	  {B}[;\n]{B}  
+END		  ({BB}|;{B})"end"
 
-TRISINGLEQUOTE    "'''"(!)?
-TRIDOUBLEQUOTE    "\"\"\""(!)?
-LONGSTRINGCHAR    [^\\"']
-ESCAPESEQ         ("\\")(.)
-LONGSTRINGITEM    ({LONGSTRINGCHAR}|{ESCAPESEQ})
-SMALLQUOTE        ("\"\""|"\""|"'"|"''")
-LONGSTRINGBLOCK   ({LONGSTRINGITEM}+|{SMALLQUOTE})
 
-SHORTSTRING       ("'"{SHORTSTRINGITEM}*"'"|'"'{SHORTSTRINGITEM}*'"')
-SHORTSTRINGITEM   ({SHORTSTRINGCHAR}|{ESCAPESEQ})
-SHORTSTRINGCHAR   [^\\\n"]
-STRINGLITERAL     {STRINGPREFIX}?( {SHORTSTRING} | {LONGSTRING})  
-STRINGPREFIX      ("r"|"u"|"ur"|"R"|"U"|"UR"|"Ur"|"uR")
-KEYWORD           ("lambda"|"import"|"class"|"assert"|"as"|"from"|"global"|"def"|"True"|"False")
-FLOWKW            ("or"|"and"|"is"|"not"|"print"|"for"|"in"|"if"|"try"|"except"|"yield"|"raise"|"break"|"continue"|"pass"|"if"|"return"|"while"|"elif"|"else"|"finally")
 POUNDCOMMENT      {B}"#"[^#\n][^\n]* 
-
-STARTDOCSYMS      ^{B}"##"/[^#]
+STARTDOCSYMS      ^{B}"##"
 
 /* emacs, please stop parsing ' */
 
@@ -496,6 +476,7 @@ STARTDOCSYMS      ^{B}"##"/[^#]
 
   /* Mid-comment states */
 
+%x SpecialComment
 
   /* Function states */
 
@@ -523,8 +504,8 @@ STARTDOCSYMS      ^{B}"##"/[^#]
 			BEGIN(ClassDec);
     		      }
 
-    ^{B}"def"{BB}       |
-    "def"{BB}           { // start of a function/method definition
+  ^{B}"def"{BB}       |
+  "def"{BB}           { // start of a function/method definition
 			  current->fileName  = yyFileName;
 			  current->startLine = yyLineNr;
 			  current->bodyLine  = yyLineNr;
@@ -540,16 +521,27 @@ STARTDOCSYMS      ^{B}"##"/[^#]
 			  current->argList->clear();
 			  g_packageCommentAllowed = FALSE;
 			  BEGIN( FunctionDec );
-                       }
+                      }
 
-  end                 {
+  {END}               {
   		        leaveNamespace();
 		      }	
 
+  {STARTDOCSYMS}      {
+  		      	g_packageCommentAllowed = FALSE;
+			initSpecialBlock();
+			BEGIN(SpecialComment);
+                      }
 
   {NEWLINE}+          { // new line
                         lineCount();
+			// \todo: the line count is really bad !
                       }
+
+
+  {POUNDCOMMENT}      {
+  		      	g_packageCommentAllowed = FALSE;
+  		      }
 
   [^\n]               { // any other character...
                         // This is the major default
@@ -557,14 +549,51 @@ STARTDOCSYMS      ^{B}"##"/[^#]
                         // else in Body.
                       }
 
+
 }
+
+<SpecialComment>{
+    ^{B}"#"("#")*	{ // skip leading hashes
+      			}
+    \n/{B}"#"		{ // continuation of the comment on the next line
+      			  docBlock+='\n';
+			  docBrief = FALSE;
+                          startCommentBlock(FALSE);
+			  yyLineNr++;
+      			}
+    [^#\n]+             { // any other stuff
+      			  docBlock+=yytext;
+      			}
+    \n			{ // new line that ends the comment
+			  handleCommentBlock(docBlock, docBrief);
+      			  yyLineNr++;
+			  BEGIN(docBlockContext);
+      			}
+    .			{ // anything we missed
+      			  docBlock += *yytext;
+      			}
+}
+
 
   /* When in this state, we ignore everything until the matching end */
 <SlurpUntilEnd>{
 
-  end                 {
-  		        BEGIN(Search);
-		      }	
+  {END}/{EOS}         {
+			if(g_nesting_level)
+			  g_nesting_level--;
+			else
+  		          BEGIN(Search);
+		      }
+
+  {EOS}(begin|if|proc|do|for)[^0-9_A-Za-z] {
+  		        g_nesting_level++;
+		      }
+
+  [^\n]               { // any other character...
+                        // This is the major default
+                        // that should catch everything
+                        // else in Body.
+                      }
 
 }
 
@@ -582,7 +611,7 @@ STARTDOCSYMS      ^{B}"##"/[^#]
   			current->stat = TRUE;
   		      }
 
-  {IDENTIFIER}        {
+  {FUNCNAME}          {
 		        //found function name
 			current->name = yytext;
 			newEntry();
