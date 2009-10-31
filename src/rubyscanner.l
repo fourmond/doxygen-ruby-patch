@@ -44,6 +44,7 @@
 #include <qfile.h>
 #include <qfileinfo.h>
 #include <qstack.h>
+#include <qvaluestack.h>
   
 #include "rubyscanner.h"
 #include "entry.h"
@@ -125,10 +126,13 @@ static bool             g_packageCommentAllowed;
 
 // For now, I can't say this is being used a lot ;-)...
 // Push_pop start conditions
-QStack<int>             g_sc_stack;
+QValueStack<int>        g_sc_stack;
 
-#define PUSH_SC g_sc_stack.push(YY_START)
-#define POP_SC BEGIN(g_sc_stack.count() ? g_sc_stack.pop() : Search)
+#define PUSH_SC(n) g_sc_stack.push(YY_START);BEGIN(n)
+#define POP_SC { if(g_sc_stack.count()) BEGIN(g_sc_stack.pop()); \
+	       	   else { printf("Out of SC stack ?? at %s:%d\n",  \
+		   	    (const char *)yyFileName,yyLineNr);    \
+			  BEGIN(Search);}}
 
 
 // Bookkeeping
@@ -437,6 +441,9 @@ BORDER            ([^A-Za-z0-9])
       /* limit of a word */
 WLIM   	  	  [^[:alnum:]!?ç]
 
+      /* all the things which start a block that must terminate with end */
+
+EBLOCK	     	  begin|if|proc|do|for|def|module|class
 
 STARTDOCSYMS      ^{B}"#"#*
 POUNDCOMMENT      {B}"#"[^#\n][^\n]* 
@@ -452,8 +459,6 @@ POUNDCOMMENT      {B}"#"[^#\n][^\n]*
   /* Various slurp states */
   /* -> until a closing 'end' statement */
 %x SlurpUntilEnd
-  /* -> until the end of a statement */
-%x SlurpUntilEoS
 
   /* Mid-comment states */
 
@@ -471,11 +476,26 @@ POUNDCOMMENT      {B}"#"[^#\n][^\n]*
 
   /* String states */
 
+%x SingleQuotedString
+%x DoubleQuotedString
+
   /* import */
 
 %%
 
   /* ------------ Main search state  -------------- */
+
+
+<Search,SlurpUntilEnd>"'" {
+  		        PUSH_SC(SingleQuotedString);
+			bookKeeping();
+		      }
+
+<Search,SlurpUntilEnd>\" {
+  		        PUSH_SC(DoubleQuotedString);
+			bookKeeping();
+		      }
+
 
 <Search>{
 
@@ -523,6 +543,7 @@ POUNDCOMMENT      {B}"#"[^#\n][^\n]*
 			BEGIN(SpecialComment);
 			bookKeeping();
                       }
+
 %{
 /* this should be enabled again if STARTDOCSYMS should include two ##
    again -- but I don't think it should be the case, as compatibility
@@ -588,7 +609,7 @@ POUNDCOMMENT      {B}"#"[^#\n][^\n]*
 			bookKeeping();
 		      }
 
-  (begin|if|proc|do|for)/{WLIM} {
+  {EBLOCK}/{WLIM} {
   			if(g_statement_ok)
   		          g_nesting_level++;
 			bookKeeping();
@@ -600,8 +621,11 @@ POUNDCOMMENT      {B}"#"[^#\n][^\n]*
 
 
   .                   { 
+  		        // printf("Slurping: '%s'\n", yytext);
   		        bookKeeping();
                       }
+
+
 }
 
 <ClassDec>{
@@ -685,6 +709,48 @@ POUNDCOMMENT      {B}"#"[^#\n][^\n]*
                       }
 
 }
+
+  /* now, handling quotes */
+
+<SingleQuotedString>{
+
+  "'"		      {
+  		        POP_SC;
+			bookKeeping();
+		      }
+
+  [^']		      {
+			bookKeeping();
+		      }
+
+}
+
+
+  /* Todo: this should be handling as well the #{ ... } 
+     substitution that can contain arbitraty code, such as
+     "end", for instance.
+  */
+
+<DoubleQuotedString>{
+
+  \\\"		      {
+  		        bookKeeping();
+  		      }
+
+  \"		      {
+  		        POP_SC;
+			bookKeeping();
+  		      }
+
+  [^"]		      {
+			bookKeeping();
+		      }
+
+}
+
+
+
+
 %%
 
 //----------------------------------------------------------------------------
