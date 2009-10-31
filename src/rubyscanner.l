@@ -123,11 +123,36 @@ static int              g_braceCount;
 static bool             g_lexInit = FALSE;
 static bool             g_packageCommentAllowed;
 
+// For now, I can't say this is being used a lot ;-)...
 // Push_pop start conditions
 QStack<int>             g_sc_stack;
 
 #define PUSH_SC g_sc_stack.push(YY_START)
 #define POP_SC BEGIN(g_sc_stack.count() ? g_sc_stack.pop() : Search)
+
+
+// Bookkeeping
+
+// Whether or not next end/def/class statement can be taken into account
+static bool             g_statement_ok;
+
+static void oneCharBookKeeping(char ch)
+{
+  if(isalnum(ch) || ch == '_' || ch == '?' || ch == '!')
+    g_statement_ok = FALSE;
+  else
+    g_statement_ok = TRUE;
+  if(ch == '\n')
+    yyLineNr++;
+}
+
+// Do bookkeeping for many things.
+static void bookKeeping()
+{
+  for( const char* c = yytext ; *c ; ++c )
+    oneCharBookKeeping(*c);
+}
+
 
 //-----------------------------------------------------------------------------
 
@@ -141,6 +166,7 @@ static void initParser()
   previous = 0;
   g_packageCommentAllowed = TRUE;
   g_packageNameCache.setAutoDelete(TRUE);
+  g_statement_ok = TRUE;
 }
 
 static void initEntry()
@@ -178,7 +204,6 @@ static void enterNamespace(QCString name, QCString type)
   /// We first look for a namespace of the like in current_root
   for(int i = 0; i < current_root->children()->count(); i++) {
     Entry * entry = const_cast<QList<Entry> *>(current_root->children())->at(i);
-    printf("Found entry #%d: %s\n", i, (const char*) entry->name);
     if(entry->section & Entry::SCOPE_MASK)
       if((!entry->name.isEmpty()) && entry->name == (baseName + name)) {
         ns = entry;
@@ -195,7 +220,7 @@ static void enterNamespace(QCString name, QCString type)
     current->reset();
   }
   else {
-    current->section = Entry::CLASS_SEC;
+    current->section = Entry::SCOPE_MASK;
     current->argList->clear();
     current->type == type ;
     current->fileName  = yyFileName;
@@ -258,51 +283,6 @@ static QCString findPackageScope(const char *fileName)
   return findPackageScopeFromPath(fi.dirPath(TRUE).data());
 }
 
-//-----------------------------------------------------------------------------
-
-static void lineCount()
-{
-  for( const char* c = yytext ; *c ; ++c )
-    yyLineNr += (*c == '\n') ;
-}
-
-#if 0
-// Appends the current-name to current-type;
-// Destroys current-name.
-// Destroys current->args and current->argList
-static void addType( Entry* current )
-{
-    uint tl=current->type.length();
-    if ( tl>0 && !current->name.isEmpty() && current->type.at(tl-1)!='.') 
-    {
-      current->type += ' ' ;
-    }
-    current->type += current->name ;
-    current->name.resize(0) ;
-    tl=current->type.length();
-    if ( tl>0 && !current->args.isEmpty() && current->type.at(tl-1)!='.') 
-    {
-      current->type += ' ' ;
-    }
-    current->type += current->args ;
-    current->args.resize(0) ;
-    current->argList->clear();
-}
-
-static QCString stripQuotes(const char *s)
-{
-  QCString name;
-  if (s==0 || *s==0) return name;
-  name=s;
-  if (name.at(0)=='"' && name.at(name.length()-1)=='"')
-  {
-    name=name.mid(1,name.length()-2);
-  }
-  return name;
-}
-#endif
-//-----------------------------------------------------------------
-
 //-----------------------------------------------------------------
 static void startCommentBlock(bool brief)
 {
@@ -329,7 +309,8 @@ static void appendDocBlock() {
 
 static void handleCommentBlock(const QCString &doc,bool brief)
 {
-  printf("handling special comment: %s\n", (const char *) doc);
+  // \todo: here should come a basic rdoc-style pre-parsing of
+  // comments 
   int position = 0;
   bool needsEntry;
   while (parseCommentBlock(g_thisParser,
@@ -432,6 +413,7 @@ BB                [ \t]+
 B                 [ \t]*
 NEWLINE           \n
 BN                [ \t\n]
+BLANK		  [[:space:]]*
 
 DIGIT             [0-9]
 
@@ -449,16 +431,15 @@ PARAMNONEMPTY     [^ \t\n():]
 CONSTNAME         {CAPITAL}({LETTER}|{DIGIT}|"_")*
 FUNCNAME          ({LETTER}|"_")({LETTER}|{DIGIT}|"_")*([?!]|{B}=)?
 IDENTIFIER        ({LETTER}|"_")({LETTER}|{DIGIT}|"_")*
-SCOPE             {IDENTIFIER}("(::\.)"{IDENTIFIER})*
+SCOPE             {CONSTNAME}("(::\.)"{CONSTNAME})*
 BORDER            ([^A-Za-z0-9])
 
-      /* end of statement */
-EOS    	  	  {B}[;\n]{B}  
-END		  ({BB}|;{B})"end"
+      /* limit of a word */
+WLIM   	  	  [^[:alnum:]!?ç]
 
 
+STARTDOCSYMS      ^{B}"#"#*
 POUNDCOMMENT      {B}"#"[^#\n][^\n]* 
-STARTDOCSYMS      ^{B}"##"
 
 /* emacs, please stop parsing ' */
 
@@ -498,14 +479,18 @@ STARTDOCSYMS      ^{B}"##"
 
 <Search>{
 
-  ^{B}(class|module){B} { // class definition
-    			g_namespace_kind =
+  (class|module)/{WLIM} { // class definition
+  			  // todo: here, a class can be followed by <<
+			if(g_statement_ok) {
+			  g_namespace_kind =
     			  QCString(yytext).stripWhiteSpace();
-			BEGIN(ClassDec);
+			  BEGIN(ClassDec);
+			}
+			bookKeeping();
     		      }
 
-  ^{B}"def"{BB}       |
   "def"{BB}           { // start of a function/method definition
+	      	        if(g_statement_ok) {
 			  current->fileName  = yyFileName;
 			  current->startLine = yyLineNr;
 			  current->bodyLine  = yyLineNr;
@@ -521,94 +506,168 @@ STARTDOCSYMS      ^{B}"##"
 			  current->argList->clear();
 			  g_packageCommentAllowed = FALSE;
 			  BEGIN( FunctionDec );
+			}
+			bookKeeping();
                       }
 
-  {END}               {
-  		        leaveNamespace();
+  "end"               {
+  		        if(g_statement_ok)
+  		          leaveNamespace();
+			bookKeeping();
 		      }	
 
   {STARTDOCSYMS}      {
+			printf("Starting doc comment");
   		      	g_packageCommentAllowed = FALSE;
 			initSpecialBlock();
 			BEGIN(SpecialComment);
+			bookKeeping();
                       }
-
-  {NEWLINE}+          { // new line
-                        lineCount();
-			// \todo: the line count is really bad !
-                      }
-
-
+%{
+/* this should be enabled again if STARTDOCSYMS should include two ##
+   again -- but I don't think it should be the case, as compatibility
+   with rdoc is a good thing (TM)
+ */
+/*
   {POUNDCOMMENT}      {
+  		        printf("Pound comment: '%s'\n", yytext);
   		      	g_packageCommentAllowed = FALSE;
   		      }
+*/
+%}
 
-  [^\n]               { // any other character...
+  .                   { // any other character...
                         // This is the major default
                         // that should catch everything
                         // else in Body.
+			bookKeeping();
                       }
+
+  {NEWLINE}           {
+  		        bookKeeping();
+  		      }
 
 
 }
 
 <SpecialComment>{
-    ^{B}"#"("#")*	{ // skip leading hashes
-      			}
-    \n/{B}"#"		{ // continuation of the comment on the next line
-      			  docBlock+='\n';
-			  docBrief = FALSE;
-                          startCommentBlock(FALSE);
-			  yyLineNr++;
-      			}
-    [^#\n]+             { // any other stuff
-      			  docBlock+=yytext;
-      			}
-    \n			{ // new line that ends the comment
-			  handleCommentBlock(docBlock, docBrief);
-      			  yyLineNr++;
-			  BEGIN(docBlockContext);
-      			}
-    .			{ // anything we missed
-      			  docBlock += *yytext;
-      			}
+    ^{B}"#"("#")*      { // skip leading hashes
+			bookKeeping();
+      		      }
+    \n/{B}"#"	      { // continuation of the comment on the next line
+      		        docBlock+='\n';
+			docBrief = FALSE;
+                        startCommentBlock(FALSE);
+			bookKeeping();
+      		      }
+    [^#\n]+           { // any other stuff
+      			docBlock+=yytext;
+			bookKeeping();
+      		      }
+    \n		      { // new line that ends the comment
+		        handleCommentBlock(docBlock, docBrief);
+			BEGIN(docBlockContext);
+			bookKeeping();
+      		      }
+    .		      { // anything we missed
+      		        docBlock += *yytext;
+			bookKeeping();
+      		      }
 }
 
 
   /* When in this state, we ignore everything until the matching end */
 <SlurpUntilEnd>{
-
-  {END}/{EOS}         {
-			if(g_nesting_level)
-			  g_nesting_level--;
-			else
-  		          BEGIN(Search);
+  "end"/{WLIM}        {	
+  		        if(g_statement_ok) {  
+  			  if(g_nesting_level)
+			    g_nesting_level--;
+			  else
+			    BEGIN(Search);
+			}
+			bookKeeping();
 		      }
 
-  {EOS}(begin|if|proc|do|for)[^0-9_A-Za-z] {
-  		        g_nesting_level++;
+  (begin|if|proc|do|for)/{WLIM} {
+  			if(g_statement_ok)
+  		          g_nesting_level++;
+			bookKeeping();
 		      }
 
-  [^\n]               { // any other character...
-                        // This is the major default
-                        // that should catch everything
-                        // else in Body.
+  {NEWLINE}           {
+  		        bookKeeping();
+  		      }
+
+
+  .                   { 
+  		        bookKeeping();
                       }
-
 }
 
-<ClassDec>{CONSTNAME} { // the name of the class, we can enter 
+<ClassDec>{
+
+  {CONSTNAME}/{B}<{B}{CONSTNAME} {
+  			// the name of the class, we can enter 
   		        // the namespace now
+			// TODO: handle the case of anonymous classes.
 			enterNamespace(QCString(yytext).stripWhiteSpace(),
+				       g_namespace_kind);
+  		        bookKeeping();
+                      }
+
+  {B}<{BLANK}{SCOPE}  {
+			// Now, we have found some class
+			QCString base = QCString(yytext).stripWhiteSpace();
+			base.remove(0,1); // remove initial stuff
+			// Note that current_root is now the class
+			current_root->extends
+			  ->append(new BaseInfo(base.stripWhiteSpace(),
+			  	       Public,Normal));
+			// We will try to look for exceptions
+                        BEGIN(Search);
+  		        bookKeeping();
+  		      }
+		      
+
+  (<<{BLANK})?{CONSTNAME} { 
+  		      	// Todo: handle the case of a scope ????
+			QCString name = QCString(yytext).stripWhiteSpace();
+			name.stripPrefix("<<");
+  		        enterNamespace(name.stripWhiteSpace(),
 				       g_namespace_kind);
                         // For now, no parsing of inheritance...
                         BEGIN(Search);
+  		        bookKeeping();
                       }
 
-<FunctionDec>{
+  [[:space:]]         { 
+  		        bookKeeping();
+                      }
+  "<<"		      {
+			printf("Warning: ignoring anonymous class in "
+			       "%s:%d",
+			       (const char *) yyFileName,
+			       yyLineNr);
+			bookKeeping();
+			BEGIN(SlurpUntilEnd);
+  		      }
+  
 
+  .                   { 
+  		        printf("Warning: garbage '%s' in class "
+  		               "definition in %s:%d\n",
+			       yytext,
+			       (const char *) yyFileName,
+			       yyLineNr);
+
+  		        bookKeeping();
+                      }
+}
+
+<FunctionDec>{
   ({CONSTNAME}|self)\.  { // this is a class function
   			current->stat = TRUE;
+			bookKeeping();
   		      }
 
   {FUNCNAME}          {
@@ -618,6 +677,11 @@ STARTDOCSYMS      ^{B}"##"
 			// Now, we ignore everything until the end of
 		        // the function
 			BEGIN(SlurpUntilEnd);			
+			bookKeeping();
+                      }
+
+  .                   { 
+  		        bookKeeping();
                       }
 
 }
@@ -779,8 +843,8 @@ void RubyLanguageScanner::parseInput(const char *fileName,const char *fileBuf,En
   g_thisParser = this;
   ::parseMain(fileName,fileBuf,root);
   // For now, we need the debugging information:
-  printf("Dumping root %p\n", root);
-  dumpEntry(root, 0);
+  // printf("Dumping root %p\n", root);
+  // dumpEntry(root, 0);
 }
 
 bool RubyLanguageScanner::needsPreprocessing(const QCString &)
