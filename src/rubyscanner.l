@@ -3,6 +3,7 @@
  * 
  *
  * Copyright (C) 1997-2008 by Dimitri van Heesch.
+ *               2009      by Vincent Fourmond
  *
  * Permission to use, copy, modify, and distribute this software and its
  * documentation under the terms of the GNU General Public License is hereby 
@@ -21,10 +22,10 @@
  *  taught by Peter H. Froehlich <phf@acm.org>.
  */
 
-/* 
-  Here, I must probably rewrite everything from scratch !
-*/
-
+/*
+ * This is the scanner for the Ruby language, but it is derived from the one
+ * for the python language, hence the credits above.
+ */
 
 %{
 
@@ -86,10 +87,6 @@ static Specifier 	virt;
 
 static QCString 	g_namespace_kind;
 
-/* stuff for slurping ;-)...*/
-static int              g_nesting_level = 0;
-
-
 static int              docBlockContext;
 static QCString         docBlock;
 static QCString         docBlockName;
@@ -139,24 +136,58 @@ QValueStack<int>        g_sc_stack;
 
 // Whether or not next end/def/class statement can be taken into account
 static bool             g_statement_ok;
+static bool		g_absorb_string;
+static void 		(*g_absorb_hook)();
+static QCString		g_absorbed_string;
 
 static void oneCharBookKeeping(char ch)
 {
+  // \todo: add a mechanism to require the "recording" of values to a string
   if(isalnum(ch) || ch == '_' || ch == '?' || ch == '!')
     g_statement_ok = FALSE;
   else
     g_statement_ok = TRUE;
   if(ch == '\n')
     yyLineNr++;
+  if(g_absorb_string)
+    g_absorbed_string += ch;
 }
 
-// Do bookkeeping for many things.
+// This function *must* be called at the end of every single rule !
 static void bookKeeping()
 {
   for( const char* c = yytext ; *c ; ++c )
     oneCharBookKeeping(*c);
 }
 
+
+static void startAbsorbing(void (*hook)() = 0)
+{
+  g_absorbed_string.resize(0);
+  g_absorb_string = TRUE;
+  g_absorb_hook = hook;
+}
+
+static void stopAbsorbing()
+{
+  g_absorb_string = FALSE;
+  if(g_absorb_hook)
+    g_absorb_hook();
+}
+
+#define ABSORB(hook) {	startAbsorbing(hook);      \
+			PUSH_SC(AbsorbExpression);}
+
+
+// Assign a default value to the argument of current.
+static void assignDefaultValue()
+{
+  if(! g_absorbed_string.isEmpty() && current->argList->last()) {
+    current->argList->last()->defval = 
+      g_absorbed_string.stripWhiteSpace();
+    g_absorbed_string.resize(0);
+  }
+}
 
 //-----------------------------------------------------------------------------
 
@@ -171,6 +202,7 @@ static void initParser()
   g_packageCommentAllowed = TRUE;
   g_packageNameCache.setAutoDelete(TRUE);
   g_statement_ok = TRUE;
+  g_absorb_string = FALSE;
 }
 
 static void initEntry()
@@ -381,7 +413,6 @@ static void initTriSingleQuoteBlock()
 
 static void initSpecialBlock()
 {
-  printf("Initializing special block !\n");
   docBlockContext   = YY_START;
   docBlockInBody    = FALSE;
   docBlockJavaStyle = TRUE;
@@ -433,8 +464,9 @@ EXPCHAR           [#(){}\[\],:.%/\\=`*~|&<>!;+-]
 NONEMPTYEXP       [^ \t\n:]
 PARAMNONEMPTY     [^ \t\n():]
 CONSTNAME         {CAPITAL}({LETTER}|{DIGIT}|"_")*
-FUNCNAME          ({LETTER}|"_")({LETTER}|{DIGIT}|"_")*([?!]|{B}=)?
 IDENTIFIER        ({LETTER}|"_")({LETTER}|{DIGIT}|"_")*
+FUNCNAME          {IDENTIFIER}([?!]|{B}=)?
+PARAMNAME         ([*&]{B})?{IDENTIFIER}
 SCOPE             {CONSTNAME}("(::\.)"{CONSTNAME})*
 BORDER            ([^A-Za-z0-9])
 
@@ -467,6 +499,7 @@ POUNDCOMMENT      {B}"#"[^#\n][^\n]*
   /* Function states */
 
 %x FunctionDec
+%x FunctionParams
 
   /* Class states */
 
@@ -479,24 +512,32 @@ POUNDCOMMENT      {B}"#"[^#\n][^\n]*
 %x SingleQuotedString
 %x DoubleQuotedString
 
+  /* expression state */
+
+%x AbsorbExpression
+
   /* import */
+
+  /* todo: an absorbVal state !*/
 
 %%
 
-  /* ------------ Main search state  -------------- */
 
 
-<Search,SlurpUntilEnd>"'" {
+  /* ------------ String Catchalls  -------------- */
+<Search,SlurpUntilEnd,AbsorbExpression>{
+  "'"		      {
   		        PUSH_SC(SingleQuotedString);
 			bookKeeping();
 		      }
 
-<Search,SlurpUntilEnd>\" {
+  \" 		      {
   		        PUSH_SC(DoubleQuotedString);
 			bookKeeping();
 		      }
+}
 
-
+  /* ------------ Main search state  -------------- */
 <Search>{
 
   (class|module)/{WLIM} { // class definition
@@ -537,7 +578,6 @@ POUNDCOMMENT      {B}"#"[^#\n][^\n]*
 		      }	
 
   {STARTDOCSYMS}      {
-			printf("Starting doc comment");
   		      	g_packageCommentAllowed = FALSE;
 			initSpecialBlock();
 			BEGIN(SpecialComment);
@@ -600,18 +640,16 @@ POUNDCOMMENT      {B}"#"[^#\n][^\n]*
   /* When in this state, we ignore everything until the matching end */
 <SlurpUntilEnd>{
   "end"/{WLIM}        {	
-  		        if(g_statement_ok) {  
-  			  if(g_nesting_level)
-			    g_nesting_level--;
-			  else
-			    BEGIN(Search);
+  		        if(g_statement_ok) {
+			  POP_SC;
 			}
 			bookKeeping();
 		      }
 
-  {EBLOCK}/{WLIM} {
-  			if(g_statement_ok)
-  		          g_nesting_level++;
+  {EBLOCK}/{WLIM}    {
+  			if(g_statement_ok) {
+			  PUSH_SC(SlurpUntilEnd);
+                        }
 			bookKeeping();
 		      }
 
@@ -653,11 +691,9 @@ POUNDCOMMENT      {B}"#"[^#\n][^\n]*
   		      }
 		      
 
-  (<<{BLANK})?{CONSTNAME} { 
+  {CONSTNAME} { 
   		      	// Todo: handle the case of a scope ????
-			QCString name = QCString(yytext).stripWhiteSpace();
-			name.stripPrefix("<<");
-  		        enterNamespace(name.stripWhiteSpace(),
+  		        enterNamespace(QCString(yytext).stripWhiteSpace(),
 				       g_namespace_kind);
                         // For now, no parsing of inheritance...
                         BEGIN(Search);
@@ -673,7 +709,8 @@ POUNDCOMMENT      {B}"#"[^#\n][^\n]*
 			       (const char *) yyFileName,
 			       yyLineNr);
 			bookKeeping();
-			BEGIN(SlurpUntilEnd);
+			BEGIN(Search); // to make sure PUSH_SC comes back to Search
+			PUSH_SC(SlurpUntilEnd);
   		      }
   
 
@@ -697,17 +734,87 @@ POUNDCOMMENT      {B}"#"[^#\n][^\n]*
   {FUNCNAME}          {
 		        //found function name
 			current->name = yytext;
-			newEntry();
-			// Now, we ignore everything until the end of
-		        // the function
-			BEGIN(SlurpUntilEnd);			
 			bookKeeping();
                       }
 
+  {B}[\n;]   	      { // function without arguments
+			newEntry();
+			BEGIN(Search); // come back to Search after slurping
+			PUSH_SC(SlurpUntilEnd);			
+			bookKeeping();
+		      }
+
+  {B}"("              {
+			BEGIN(FunctionParams);
+			bookKeeping();
+		      }
+
+
   .                   { 
+  		        printf("Warning: garbage '%s' in function "
+  		               "definition in %s:%d\n",
+			       yytext,
+			       (const char *) yyFileName,
+			       yyLineNr);
   		        bookKeeping();
                       }
 
+}
+
+  /* function parameters */
+
+<FunctionParams>{
+  ","		      { 
+  		        bookKeeping();	 
+                      }
+
+  {PARAMNAME}         { // Name of parameter
+			Argument *a = new Argument;
+			printf("Found argument: %s\n",
+			       yytext);
+			current->argList->append(a);
+			current->argList->getLast()->name = 
+			  QCString(yytext).stripWhiteSpace();
+			current->argList->getLast()->type = "";
+    		        bookKeeping();	 
+                      }
+
+  {BB}		      {
+  		        bookKeeping();
+  		      }
+
+  ")"		      {
+			newEntry();
+			BEGIN(Search); // come back to Search after slurping
+			PUSH_SC(SlurpUntilEnd);			
+    		        bookKeeping();	 
+  		      }
+
+  "="		      {
+  		        bookKeeping(); // must be done before, for once ;-) !
+			ABSORB(assignDefaultValue);
+  		      }
+
+  .                   { 
+  		        printf("Warning: garbage '%s' in function "
+  		               "parameters in %s:%d\n",
+			       yytext,
+			       (const char *) yyFileName,
+			       yyLineNr);
+  		        bookKeeping();
+                      }
+
+}
+
+<AbsorbExpression>{
+  [,\n)]	      { // finish the expression ?
+  		        stopAbsorbing();
+  		        POP_SC;
+			yyless(0); // and we push back
+		      }
+  .		      {
+  		        bookKeeping();
+  		      }	   
 }
 
   /* now, handling quotes */
@@ -722,6 +829,7 @@ POUNDCOMMENT      {B}"#"[^#\n][^\n]*
   [^']		      {
 			bookKeeping();
 		      }
+
 
 }
 
