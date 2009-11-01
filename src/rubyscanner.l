@@ -133,8 +133,6 @@ QValueStack<int>        g_sc_stack;
 
 
 // Bookkeeping
-
-// Whether or not next end/def/class statement can be taken into account
 static bool             g_statement_ok;
 static bool		g_absorb_string;
 static void 		(*g_absorb_hook)();
@@ -160,6 +158,49 @@ static void bookKeeping()
     oneCharBookKeeping(*c);
 }
 
+
+//-----------------------------------------------------------------------------
+
+
+static void initParser()
+{
+  protection = Public;
+  mtype = Method;
+  gstat = FALSE;
+  virt = Normal;
+  previous = 0;
+  g_packageCommentAllowed = TRUE;
+  g_packageNameCache.setAutoDelete(TRUE);
+  g_statement_ok = TRUE;
+  g_absorb_string = FALSE;
+  g_absorb_hook = 0;
+}
+
+static void initEntry()
+{
+  //current->python = TRUE;
+  current->protection = protection ;
+  current->mtype      = mtype;
+  current->virt       = virt;
+  current->stat       = gstat;
+  current->objc       = FALSE; //insideObjC;
+  current->setParent(current_root);
+  initGroupInfo(current);
+}
+
+static void newEntry()
+{
+  previous = current;
+  if(current_root != current)
+    current_root->addSubEntry(current);
+  current = new Entry ;
+  initEntry();
+}
+
+//////////////////////////////////////////////////////////////////////
+// Bookkeeping
+
+// Whether or not next end/def/class statement can be taken into account
 
 static void startAbsorbing(void (*hook)() = 0)
 {
@@ -189,41 +230,14 @@ static void assignDefaultValue()
   }
 }
 
-//-----------------------------------------------------------------------------
-
-
-static void initParser()
+// Assign a default value to the argument of current.
+static void assignConstant()
 {
-  protection = Public;
-  mtype = Method;
-  gstat = FALSE;
-  virt = Normal;
-  previous = 0;
-  g_packageCommentAllowed = TRUE;
-  g_packageNameCache.setAutoDelete(TRUE);
-  g_statement_ok = TRUE;
-  g_absorb_string = FALSE;
-}
-
-static void initEntry()
-{
-  //current->python = TRUE;
-  current->protection = protection ;
-  current->mtype      = mtype;
-  current->virt       = virt;
-  current->stat       = gstat;
-  current->objc       = FALSE; //insideObjC;
-  current->setParent(current_root);
-  initGroupInfo(current);
-}
-
-static void newEntry()
-{
-  previous = current;
-  if(current_root != current)
-    current_root->addSubEntry(current);
-  current = new Entry ;
-  initEntry();
+  if(! g_absorbed_string.isEmpty()) {
+    current->initializer = g_absorbed_string;
+    g_absorbed_string.resize(0);
+  }
+  newEntry();
 }
 
 
@@ -266,6 +280,8 @@ static void enterNamespace(QCString name, QCString type)
     ns = current;
     newEntry();
   }
+
+  groupEnterCompound(yyFileName,yyLineNr,baseName + name);
   
   if(ns->parent() != current_root)
     printf("Not automatically setting parent !\n");
@@ -276,8 +292,10 @@ static void enterNamespace(QCString name, QCString type)
 
 static void leaveNamespace()
 {
-  if(current_root != global_root)
+  if(current_root != global_root) {
     current_root = current_root->parent();
+    groupLeaveCompound(yyFileName,yyLineNr,"");
+  }
   else {
     fprintf(stderr, "Warning: attempting to end root namespace at %s:"
     "%d\n\%s\n",
@@ -584,6 +602,20 @@ POUNDCOMMENT      {B}"#"[^#\n][^\n]*
 			bookKeeping();
                       }
 
+  {CONSTNAME}{B}=     { // A constant definition
+  		      	QCString name(yytext);
+			name.resize(name.size() - 1);
+  		        current->name = name.stripWhiteSpace();
+			current->protection = Public;
+			current->fileName  = yyFileName;
+			current->startLine = yyLineNr;
+			current->bodyLine  = yyLineNr;
+			current->section = Entry::VARIABLE_SEC;
+			current->spec = 0;
+			bookKeeping();
+			ABSORB(assignConstant);
+  		      }
+
 %{
 /* this should be enabled again if STARTDOCSYMS should include two ##
    again -- but I don't think it should be the case, as compatibility
@@ -705,7 +737,7 @@ POUNDCOMMENT      {B}"#"[^#\n][^\n]*
                       }
   "<<"		      {
 			printf("Warning: ignoring anonymous class in "
-			       "%s:%d",
+			       "%s:%d\n",
 			       (const char *) yyFileName,
 			       yyLineNr);
 			bookKeeping();
