@@ -269,20 +269,21 @@ static void assignConstant()
 // up with a list of symbols.
 static QValueList<QCString> parseSymbols(QCString s)
 {
+  QString str = s;
+  int idx,len;
+  QRegExp resym("[^:,'\" \t\n]+");
   QValueList<QCString> symbols;
-  QCString str = s;
-  while(str.size() > 0) {
-    str = str.stripWhiteSpace();
-    if(str[0] == ':') {
-      int idx = str.find(',');
-      QCString symbol;
-      if(idx < 0)
-        idx = str.size();
-      symbol = str.left(idx);
-      symbols.append(symbol);
-      str = str.mid(idx);
-    }
+  // Black magic, as for some reason the code below does not
+  // work if that isn't here...
+  const char * b = (const char *) str.local8Bit();
+  while((idx = resym.match(str, idx, &len))>=0) {
+    // printf("Match: %s %d %d\n", (const char*) str.local8Bit(),
+    // 	   idx, len);
+    QCString sym = str.mid(idx, len).local8Bit();
+    symbols.append(sym);
+    idx+=len;
   }
+  return symbols;
 }
 
 // TODO: does not work at all...
