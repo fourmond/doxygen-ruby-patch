@@ -132,8 +132,13 @@ QValueStack<int>        g_sc_stack;
 			  BEGIN(Search);}}
 
 
+//////////////////////////////////////////////////////////////////////
 // Bookkeeping
-static bool             g_statement_ok;
+
+// Whether or not next end/def/class statement can be taken into account
+static bool             g_statement_ok; // OK to start a statement ?
+// OK to finish an "expression" on a newline (excludes opening if and so on)?
+static bool 		g_can_end; 
 static bool		g_absorb_string;
 static void 		(*g_absorb_hook)();
 static QCString		g_absorbed_string;
@@ -147,8 +152,14 @@ static void oneCharBookKeeping(char ch)
     g_statement_ok = TRUE;
   if(ch == '\n')
     yyLineNr++;
+  if(strchr("*,+-/.\\", ch))
+    g_can_end = FALSE;
+  else
+    g_can_end = TRUE;
   if(g_absorb_string)
     g_absorbed_string += ch;
+//  if(g_absorb_string)
+//    printf("Absorbing: %s\n", (const char*)g_absorbed_string);
 }
 
 // This function *must* be called at the end of every single rule !
@@ -172,6 +183,7 @@ static void initParser()
   g_packageCommentAllowed = TRUE;
   g_packageNameCache.setAutoDelete(TRUE);
   g_statement_ok = TRUE;
+  g_can_end = TRUE;
   g_absorb_string = FALSE;
   g_absorb_hook = 0;
 }
@@ -198,26 +210,37 @@ static void newEntry()
 }
 
 //////////////////////////////////////////////////////////////////////
-// Bookkeeping
+// Expression absorption
 
-// Whether or not next end/def/class statement can be taken into account
+static QValueStack<const char *> g_expression_delimiters;
+static bool 		         g_keep_last;
 
-static void startAbsorbing(void (*hook)() = 0)
+static void startAbsorbing(const char * delim, bool keep,
+       	    		   void (*hook)() = 0)
 {
   g_absorbed_string.resize(0);
   g_absorb_string = TRUE;
   g_absorb_hook = hook;
+  g_expression_delimiters.clear();
+  g_expression_delimiters.append(delim);
+  g_keep_last = keep;
 }
 
 static void stopAbsorbing()
 {
+  g_expression_delimiters.clear();
   g_absorb_string = FALSE;
   if(g_absorb_hook)
     g_absorb_hook();
 }
 
-#define ABSORB(hook) {	startAbsorbing(hook);      \
+#define ABSORB_UNTIL(what, keep, hook) { startAbsorbing(what,keep,hook);      \
 			PUSH_SC(AbsorbExpression);}
+
+// To be used within an expression...
+#define CONTINUE_UNTIL(what) { g_expression_delimiters.append(what); \
+			PUSH_SC(AbsorbExpression);}
+
 
 
 // Assign a default value to the argument of current.
@@ -235,9 +258,46 @@ static void assignConstant()
 {
   if(! g_absorbed_string.isEmpty()) {
     current->initializer = g_absorbed_string;
+    printf("Assigned constant initial value: %s",
+    	   (const char *) g_absorbed_string);
     g_absorbed_string.resize(0);
   }
   newEntry();
+}
+
+// In this function, we parse a list of strings or symbols to end
+// up with a list of symbols.
+static QValueList<QCString> parseSymbols(QCString s)
+{
+  QValueList<QCString> symbols;
+  QCString str = s;
+  while(str.size() > 0) {
+    str = str.stripWhiteSpace();
+    if(str[0] == ':') {
+      int idx = str.find(',');
+      QCString symbol;
+      if(idx < 0)
+        idx = str.size();
+      symbol = str.left(idx);
+      symbols.append(symbol);
+      str = str.mid(idx);
+    }
+  }
+}
+
+// TODO: does not work at all...
+// Assign a default value to the argument of current.
+static void doAttributes()
+{
+  if(! g_absorbed_string.isEmpty()) {
+    printf("Doing attributes %s\n",
+    	   (const char *) g_absorbed_string);
+    QValueList<QCString> symbols = 
+      parseSymbols(g_absorbed_string);
+    for(int i = 0; i < symbols.count(); i++)
+      printf("Symbol %d: %s\n", i, (const char*)symbols[i]);
+    g_absorbed_string.resize(0);
+  }
 }
 
 
@@ -489,7 +549,7 @@ SCOPE             {CONSTNAME}("(::\.)"{CONSTNAME})*
 BORDER            ([^A-Za-z0-9])
 
       /* limit of a word */
-WLIM   	  	  [^[:alnum:]!?ç]
+WLIM   	  	  [^[:alnum:]!?_]
 
       /* all the things which start a block that must terminate with end */
 
@@ -613,7 +673,12 @@ POUNDCOMMENT      {B}"#"[^#\n][^\n]*
 			current->section = Entry::VARIABLE_SEC;
 			current->spec = 0;
 			bookKeeping();
-			ABSORB(assignConstant);
+			ABSORB_UNTIL("\n;",FALSE, assignConstant);
+  		      }
+
+  attr_accessor/{WLIM} {
+  		        bookKeeping();
+		        ABSORB_UNTIL("\n;",FALSE, doAttributes);
   		      }
 
 %{
@@ -706,6 +771,8 @@ POUNDCOMMENT      {B}"#"[^#\n][^\n]*
 			// TODO: handle the case of anonymous classes.
 			enterNamespace(QCString(yytext).stripWhiteSpace(),
 				       g_namespace_kind);
+			if(current_root->name.contains("Exception"))
+			  current_root->spec |= Entry::Exception;
   		        bookKeeping();
                       }
 
@@ -717,6 +784,8 @@ POUNDCOMMENT      {B}"#"[^#\n][^\n]*
 			current_root->extends
 			  ->append(new BaseInfo(base.stripWhiteSpace(),
 			  	       Public,Normal));
+			if(base.contains("Exception"))
+			  current_root->spec |= Entry::Exception;
 			// We will try to look for exceptions
                         BEGIN(Search);
   		        bookKeeping();
@@ -824,7 +893,7 @@ POUNDCOMMENT      {B}"#"[^#\n][^\n]*
 
   "="		      {
   		        bookKeeping(); // must be done before, for once ;-) !
-			ABSORB(assignDefaultValue);
+			ABSORB_UNTIL(",)",TRUE, assignDefaultValue);
   		      }
 
   .                   { 
@@ -839,14 +908,46 @@ POUNDCOMMENT      {B}"#"[^#\n][^\n]*
 }
 
 <AbsorbExpression>{
-  [,\n)]	      { // finish the expression ?
-  		        stopAbsorbing();
-  		        POP_SC;
-			yyless(0); // and we push back
+  {EBLOCK}/{WLIM}     {
+  			if(g_statement_ok) {
+			  PUSH_SC(SlurpUntilEnd);
+                        }
+			bookKeeping();
 		      }
-  .		      {
-  		        bookKeeping();
-  		      }	   
+  "{"		      {
+  		        CONTINUE_UNTIL("}");
+			bookKeeping();
+  		      }
+  "["		      {
+  		        CONTINUE_UNTIL("]");
+			bookKeeping();
+  		      }
+
+  "("		      {
+  		        CONTINUE_UNTIL(")");
+			bookKeeping();
+  		      }
+
+  .|\n		      {
+  		        if(g_can_end && 
+			  strchr(g_expression_delimiters.last(),*yytext)) {
+			  if(g_expression_delimiters.count() == 1) {
+  		            stopAbsorbing();
+			    if(g_keep_last)
+			      yyless(0); // and we push back
+			    else
+			      bookKeeping();
+                          }
+			  else {
+			    g_expression_delimiters.pop();
+			    bookKeeping();
+			  }
+  		          POP_SC;
+			}
+			else
+			  bookKeeping();
+		      }
+
 }
 
   /* now, handling quotes */
