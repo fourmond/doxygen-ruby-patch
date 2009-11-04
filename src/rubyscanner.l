@@ -286,17 +286,38 @@ static QValueList<QCString> parseSymbols(QCString s)
   return symbols;
 }
 
-// TODO: does not work at all...
+
+static QCString g_attribute_function;
+
 // Assign a default value to the argument of current.
 static void doAttributes()
 {
   if(! g_absorbed_string.isEmpty()) {
-    printf("Doing attributes %s\n",
-    	   (const char *) g_absorbed_string);
+    int attr;
+    if(g_attribute_function.contains("attr_accessor"))
+      attr = Entry::Readable|Entry::Writable;
+    else if (g_attribute_function.contains("attr_writer"))
+      attr = Entry::Writable;
+    else if (g_attribute_function.contains("attr_writer"))
+      attr = Entry::Readable;
+    else {
+      printf("Attribute function not understood: %s\n",
+	     (const char *) g_attribute_function);
+      attr = 0;
+    }
+      
     QValueList<QCString> symbols = 
       parseSymbols(g_absorbed_string);
-    for(int i = 0; i < symbols.count(); i++)
-      printf("Symbol %d: %s\n", i, (const char*)symbols[i]);
+    for(int i = 0; i < symbols.count(); i++) {
+      current->name = symbols[i];
+      current->protection = Public;
+      current->fileName  = yyFileName;
+      current->startLine = yyLineNr;
+      current->bodyLine  = yyLineNr;
+      current->section = Entry::VARIABLE_SEC;
+      current->spec = attr;
+      newEntry();
+    }
     g_absorbed_string.resize(0);
   }
 }
@@ -530,18 +551,11 @@ BN                [ \t\n]
 BLANK		  [[:space:]]*
 
 DIGIT             [0-9]
-
-HEXNUMBER         "0"[xX][0-9a-fA-F]+[lL]?
-OCTNUMBER         "0"[0-7]+[lL]?
-NUMBER            {DIGIT}+[lLjJ]?
-INTNUMBER         {HEXNUMBER}|{OCTNUMBER}|{NUMBER}
-FLOATNUMBER       {DIGIT}+"."{DIGIT}+([eE][+\-]?{DIGIT}+)?[jJ]?
 LETTER            [A-Za-z]
 CAPITAL           [A-Z]
-NONEMPTY          [A-Za-z0-9_]
+
+
 EXPCHAR           [#(){}\[\],:.%/\\=`*~|&<>!;+-]
-NONEMPTYEXP       [^ \t\n:]
-PARAMNONEMPTY     [^ \t\n():]
 CONSTNAME         {CAPITAL}({LETTER}|{DIGIT}|"_")*
 IDENTIFIER        ({LETTER}|"_")({LETTER}|{DIGIT}|"_")*
 FUNCNAME          {IDENTIFIER}([?!]|{B}=)?
@@ -554,10 +568,14 @@ WLIM   	  	  [^[:alnum:]!?_]
 
       /* all the things which start a block that must terminate with end */
 
-EBLOCK	     	  begin|if|proc|do|for|def|module|class
+EBLOCK	     	  begin|if|while|until|unless|proc|do|for|def|module|class
 
 STARTDOCSYMS      ^{B}"#"#*
 POUNDCOMMENT      {B}"#"[^#\n][^\n]* 
+
+     /* attribute specifiers */
+
+ATTR_SPEC	  attr_(accessor|writer|reader)
 
 /* emacs, please stop parsing ' */
 
@@ -672,12 +690,14 @@ POUNDCOMMENT      {B}"#"[^#\n][^\n]*
 			current->startLine = yyLineNr;
 			current->bodyLine  = yyLineNr;
 			current->section = Entry::VARIABLE_SEC;
-			current->spec = 0;
+			current->spec = Entry::Initonly;
 			bookKeeping();
 			ABSORB_UNTIL("\n;",FALSE, assignConstant);
   		      }
 
-  attr_accessor/{WLIM} {
+  {ATTR_SPEC}/{WLIM}  {
+  		        g_attribute_function = 
+			  QCString(yytext).stripWhiteSpace();
   		        bookKeeping();
 		        ABSORB_UNTIL("\n;",FALSE, doAttributes);
   		      }
