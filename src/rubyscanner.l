@@ -131,6 +131,12 @@ QValueStack<int>        g_sc_stack;
 		   	    (const char *)yyFileName,yyLineNr);    \
 			  BEGIN(Search);}}
 
+/// \todo a configuration value should offer the possibility to prefer
+/// a 'rdoc-compatible' mode where all comments are taken into
+/// account, but a blank line discards previous contents, and a
+/// 'normal' mode resembling the usual C++ one: nothing gets into the
+/// documentatin unless you ask for it with a specific format of the
+/// comments.
 
 //////////////////////////////////////////////////////////////////////
 // Bookkeeping
@@ -322,7 +328,6 @@ static void doAttributes()
   }
 }
 
-
 /// Enters a new namespace, creating it based on the current entry
 /// if it does not exist, or merely copying its documentation to the
 /// current definition if it does. The name is relative to the current
@@ -343,8 +348,7 @@ static void enterNamespace(QCString name, QCString type)
       }
   }
   
-  if(ns) { // we copy any documentation lying around
-    // todo: append documentation !
+  if(ns) { 
     if(ns->type != type) 
       fprintf(stderr, "Warning: %s was declared as %s but now as %s\n",
       	      (const char *) ns->name,
@@ -445,8 +449,8 @@ static void appendDocBlock() {
 
 static void handleCommentBlock(const QCString &doc,bool brief)
 {
-  // \todo: here should come a basic rdoc-style pre-parsing of
-  // comments 
+  /// \todo here should come a basic rdoc-style pre-parsing of
+  /// comments, only triggered when 
   int position = 0;
   bool needsEntry;
   while (parseCommentBlock(g_thisParser,
@@ -663,6 +667,7 @@ ATTR_SPEC	  attr_(accessor|writer|reader)
 			  current->args.resize(0);
 			  current->argList->clear();
 			  g_packageCommentAllowed = FALSE;
+			  docBlockInBody = FALSE;
 			  BEGIN( FunctionDec );
 			}
 			bookKeeping();
@@ -763,6 +768,15 @@ ATTR_SPEC	  attr_(accessor|writer|reader)
 			}
 			bookKeeping();
 		      }
+
+  {STARTDOCSYMS}      {
+                        printf("Starting special comment inside block\n");
+  		      	g_packageCommentAllowed = FALSE;
+			initSpecialBlock();
+			BEGIN(SpecialComment);
+			docBlockInBody = TRUE;
+			bookKeeping();
+                      }
 
   {EBLOCK}/{WLIM}    {
   			if(g_statement_ok) {
