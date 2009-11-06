@@ -216,6 +216,21 @@ static void newEntry()
 }
 
 //////////////////////////////////////////////////////////////////////
+// Lookup for one function
+
+static Entry * lookupFunction(QCString name)
+{
+  if(! current_root)
+    return 0;
+  QList<Entry> * c = const_cast<QList<Entry> * >(current_root->children());
+  for(int i = 0; i < c->count(); i++)
+    if(c->at(i)->name == name)
+      return c->at(i);
+
+  return 0;
+}
+
+//////////////////////////////////////////////////////////////////////
 // Expression absorption
 
 static QValueStack<const char *> g_expression_delimiters;
@@ -328,6 +343,29 @@ static void doAttributes()
   }
 }
 
+static Protection g_pending_protection;
+
+/// Does parsing of the protection stuff
+static void doProtection()
+{
+  QValueList<QCString> symbols = 
+    parseSymbols(g_absorbed_string);
+  printf("Symbols count: %d\n", symbols.count());
+  if(symbols.count() > 0) {
+    // We do not touch global protection
+    for(int i = 0; i < symbols.count(); i++) {
+      Entry * func = lookupFunction(symbols[i]);
+      if(func)
+	func->protection = g_pending_protection;
+    }
+  }
+  else // only update protection level
+    protection = g_pending_protection;
+  g_absorbed_string.resize(0);
+}
+
+static QValueStack<Protection> protectionStack;
+
 /// Enters a new namespace, creating it based on the current entry
 /// if it does not exist, or merely copying its documentation to the
 /// current definition if it does. The name is relative to the current
@@ -363,6 +401,7 @@ static void enterNamespace(QCString name, QCString type)
     current->bodyLine  = yyLineNr;
     current->name = baseName + name;
     g_packageCommentAllowed = FALSE;
+    protectionStack.push(protection);
     ns = current;
     newEntry();
   }
@@ -380,6 +419,10 @@ static void leaveNamespace()
 {
   if(current_root != global_root) {
     current_root = current_root->parent();
+    if(protectionStack.count() >= 1)
+      protection = protectionStack.pop();
+    else
+      protection = Public; // ?? should that happen ?
     groupLeaveCompound(yyFileName,yyLineNr,"");
   }
   else {
@@ -580,6 +623,7 @@ POUNDCOMMENT      {B}"#"[^#\n][^\n]*
      /* attribute specifiers */
 
 ATTR_SPEC	  attr_(accessor|writer|reader)
+PROTECTION	  (public|protected|private)
 
 /* emacs, please stop parsing ' */
 
@@ -657,7 +701,9 @@ ATTR_SPEC	  attr_(accessor|writer|reader)
 			  current->startLine = yyLineNr;
 			  current->bodyLine  = yyLineNr;
 			  current->section = Entry::FUNCTION_SEC;
-			  current->protection = Public;
+			  current->protection = protection;
+			  /// @todo: keep protection information
+			  /// for nested classes
 			  current->objc = FALSE;
 			  current->virt = Normal;
 			  current->stat = FALSE;
@@ -701,10 +747,32 @@ ATTR_SPEC	  attr_(accessor|writer|reader)
   		      }
 
   {ATTR_SPEC}/{WLIM}  {
-  		        g_attribute_function = 
-			  QCString(yytext).stripWhiteSpace();
-  		        bookKeeping();
-		        ABSORB_UNTIL("\n;",FALSE, doAttributes);
+  		        if(g_statement_ok) {
+  		          g_attribute_function = 
+			    QCString(yytext).stripWhiteSpace();
+  		          bookKeeping();
+		          ABSORB_UNTIL("\n;",FALSE, doAttributes);
+			}
+			else 
+			  bookKeeping();
+  		      }
+
+  {PROTECTION}/{WLIM}  {
+  		        if(g_statement_ok) {
+			  QCString prot = 
+			    QCString(yytext).stripWhiteSpace();
+			  printf("Protection: %s\n", yytext);
+			  if(prot.contains("public"))
+			    g_pending_protection = Public;
+			  else if(prot.contains("private"))
+			    g_pending_protection = Private;
+			  else
+			    g_pending_protection = Protected;
+  		          bookKeeping();
+		          ABSORB_UNTIL("\n;",FALSE, doProtection);
+			}
+			else 
+			  bookKeeping();
   		      }
 
 %{
