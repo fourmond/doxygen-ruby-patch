@@ -310,6 +310,12 @@ void addConfigOptions(Config *cfg)
                  FALSE
                 );
   //----
+  cb = cfg->addBool(
+                 "RUBY_RDOC_COMPATIBILITY",
+                 "When this option is on (YES, the default), doxygen will attempt to parse comments in Ruby files a bit in the same way as rdoc would. This is to facilitate the transition from a rdoc-based documentation to a doxygen-based one. Hopefully, after some time, you can set it back to NO.",
+                 TRUE
+                );
+  //----
   cl = cfg->addList(
                  "EXTENSION_MAPPING",
                  "Doxygen selects the parser to use depending on the extension of the files it parses.\n"

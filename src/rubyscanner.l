@@ -85,6 +85,9 @@ static MethodTypes 	mtype;
 static bool    		gstat;
 static Specifier 	virt;
 
+/// @todo make this variable actually do something useful !
+static bool		rdoc_compatibility = TRUE;
+
 static QCString 	g_namespace_kind;
 
 static int              docBlockContext;
@@ -181,6 +184,7 @@ static void bookKeeping()
 
 static void initParser()
 {
+  rdoc_compatibility = Config_getBool("RUBY_RDOC_COMPATIBILITY");
   protection = Public;
   mtype = Method;
   gstat = FALSE;

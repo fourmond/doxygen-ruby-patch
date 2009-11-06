@@ -221,6 +221,13 @@ Set the OPTIMIZE_OUTPUT_VHDL tag to YES if your project consists of VHDL
 sources. Doxygen will then generate output that is tailored for 
 VHDL. 
 ' defval='0'/>
+    <option type='bool' id='RUBY_RDOC_COMPATIBILITY' docs='
+When this option is on (YES, the default), doxygen will attempt to
+parse comments in Ruby files a bit in the same way as rdoc would. This
+is to facilitate the transition from a rdoc-based documentation to a
+doxygen-based one. Hopefully, after some time, you can set it back to
+NO.
+' defval='1'/>
     <option type='list' id='EXTENSION_MAPPING' format='string' docs='
 Doxygen selects the parser to use depending on the extension of the files it parses. 
 With this tag you can assign which parser to use for a given extension. 
