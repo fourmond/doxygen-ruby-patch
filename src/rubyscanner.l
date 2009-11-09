@@ -124,7 +124,6 @@ static int              g_braceCount;
 static bool             g_lexInit = FALSE;
 static bool             g_packageCommentAllowed;
 
-// For now, I can't say this is being used a lot ;-)...
 // Push_pop start conditions
 QValueStack<int>        g_sc_stack;
 
@@ -145,7 +144,9 @@ QValueStack<int>        g_sc_stack;
 // Bookkeeping
 
 // Whether or not next end/def/class statement can be taken into account
-static bool             g_statement_ok; // OK to start a statement ?
+static bool             g_statement_ok; 
+// Whether or not the next thing can start an expression.
+static bool             g_expression_ok; // OK to start an expression
 // OK to finish an "expression" on a newline (excludes opening if and so on)?
 static bool 		g_can_end; 
 static bool		g_absorb_string;
@@ -154,11 +155,18 @@ static QCString		g_absorbed_string;
 
 static void oneCharBookKeeping(char ch)
 {
-  // \todo: add a mechanism to require the "recording" of values to a string
   if(isalnum(ch) || ch == '_' || ch == '?' || ch == '!')
-    g_statement_ok = FALSE;
+    g_expression_ok = FALSE;
   else
-    g_statement_ok = TRUE;
+    g_expression_ok = TRUE;
+  if(! g_expression_ok)
+    g_statement_ok = FALSE;
+  else {
+    if(ch == '\n' || ch == ';')
+      g_statement_ok = TRUE;
+    else if(! (ch == ' ' || ch == '\t'))
+      g_statement_ok = FALSE;
+  }
   if(ch == '\n')
     yyLineNr++;
   if(strchr("*,+-/.\\", ch))
@@ -193,6 +201,7 @@ static void initParser()
   g_packageCommentAllowed = TRUE;
   g_packageNameCache.setAutoDelete(TRUE);
   g_statement_ok = TRUE;
+  g_expression_ok = TRUE;
   g_can_end = TRUE;
   g_absorb_string = FALSE;
   g_absorb_hook = 0;
@@ -283,8 +292,8 @@ static void assignConstant()
 {
   if(! g_absorbed_string.isEmpty()) {
     current->initializer = g_absorbed_string;
-    printf("Assigned constant initial value: %s",
-    	   (const char *) g_absorbed_string);
+    // printf("Assigned constant initial value: %s",
+    //	   (const char *) g_absorbed_string);
     g_absorbed_string.resize(0);
   }
   newEntry();
@@ -323,7 +332,7 @@ static void doAttributes()
       attr = Entry::Readable|Entry::Writable;
     else if (g_attribute_function.contains("attr_writer"))
       attr = Entry::Writable;
-    else if (g_attribute_function.contains("attr_writer"))
+    else if (g_attribute_function.contains("attr_reader"))
       attr = Entry::Readable;
     else {
       printf("Attribute function not understood: %s\n",
@@ -354,7 +363,7 @@ static void doProtection()
 {
   QValueList<QCString> symbols = 
     parseSymbols(g_absorbed_string);
-  printf("Symbols count: %d\n", symbols.count());
+  // printf("Symbols count: %d\n", symbols.count());
   if(symbols.count() > 0) {
     // We do not touch global protection
     for(int i = 0; i < symbols.count(); i++) {
@@ -380,6 +389,11 @@ static void enterNamespace(QCString name, QCString type)
   QCString baseName = current_root->name;
   if(! baseName.isEmpty())
     baseName += "::";
+
+  // printf("Entering namespace %s at %s:%d\n",
+  // 	 (const char*) (baseName + name),
+  // 	 (const char*) yyFileName, yyLineNr);
+
   /// We first look for a namespace of the like in current_root
   for(int i = 0; i < current_root->children()->count(); i++) {
     Entry * entry = const_cast<QList<Entry> *>(current_root->children())->at(i);
@@ -422,6 +436,9 @@ static void enterNamespace(QCString name, QCString type)
 static void leaveNamespace()
 {
   if(current_root != global_root) {
+    // printf("Leaving namespace %s at %s:%d\n",
+    // 	   (const char*) current_root->name,
+    // 	   (const char*) yyFileName, yyLineNr);
     current_root = current_root->parent();
     if(protectionStack.count() >= 1)
       protection = protectionStack.pop();
@@ -606,9 +623,10 @@ LETTER            [A-Za-z]
 CAPITAL           [A-Z]
 
 
+OPERATOR	  "*"|<<|>>|"/"|"+"|-|"**"
 EXPCHAR           [#(){}\[\],:.%/\\=`*~|&<>!;+-]
 CONSTNAME         {CAPITAL}({LETTER}|{DIGIT}|"_")*
-IDENTIFIER        ({LETTER}|"_")({LETTER}|{DIGIT}|"_")*
+IDENTIFIER        ({LETTER}|"_")({LETTER}|{DIGIT}|"_")*|{OPERATOR}
 FUNCNAME          {IDENTIFIER}([?!]|{B}=)?
 PARAMNAME         ([*&]{B})?{IDENTIFIER}
 SCOPE             {CONSTNAME}("(::\.)"{CONSTNAME})*
@@ -619,9 +637,13 @@ WLIM   	  	  [^[:alnum:]!?_]
 
       /* all the things which start a block that must terminate with end */
 
-EBLOCK	     	  begin|if|while|until|unless|proc|do|for|def|module|class
+      /* the ones that must start with a statement */
+SBLOCK	     	  if|while|until|unless
+      /* the ones for which we don't care too much */
+EBLOCK	     	  begin|proc|do|for|def|case|module|class
 
-STARTDOCSYMS      ^{B}"#"#*
+STARTDOCSYMS      ^{B}"#"#+
+STARTPOUND        ^{B}"#"/[^#\n]
 POUNDCOMMENT      {B}"#"[^#\n][^\n]* 
 
      /* attribute specifiers */
@@ -640,6 +662,9 @@ PROTECTION	  (public|protected|private)
   /* Various slurp states */
   /* -> until a closing 'end' statement */
 %x SlurpUntilEnd
+
+  /* the easiest one: until end of line */
+%x SlurpUntilEoL
 
   /* Mid-comment states */
 
@@ -667,11 +692,12 @@ PROTECTION	  (public|protected|private)
 
   /* import */
 
-  /* todo: an absorbVal state !*/
-
 %%
 
-
+  /* @todo
+    * parsing of include/extend/alias/undef
+    * parsing of the constructs return stuff unless...
+  */
 
   /* ------------ String Catchalls  -------------- */
 <Search,SlurpUntilEnd,AbsorbExpression>{
@@ -686,15 +712,30 @@ PROTECTION	  (public|protected|private)
 		      }
 }
 
+<SlurpUntilEoL>{
+  {NEWLINE}	      {
+			POP_SC;
+			bookKeeping();
+		      }
+
+  .		      {
+			bookKeeping();
+		      }
+}
+
   /* ------------ Main search state  -------------- */
 <Search>{
 
   (class|module)/{WLIM} { // class definition
-  			  // todo: here, a class can be followed by <<
 			if(g_statement_ok) {
 			  g_namespace_kind =
-    			  QCString(yytext).stripWhiteSpace();
+			    QCString(yytext).stripWhiteSpace();
 			  BEGIN(ClassDec);
+			}
+			else {
+			  printf("Potentially missing class|module desc "
+				 "at %s:%d", (const char*) yyFileName,
+				 yyLineNr);
 			}
 			bookKeeping();
     		      }
@@ -730,11 +771,22 @@ PROTECTION	  (public|protected|private)
 		      }	
 
   {STARTDOCSYMS}      {
-  		      	g_packageCommentAllowed = FALSE;
-			initSpecialBlock();
-			BEGIN(SpecialComment);
 			bookKeeping();
                       }
+
+
+  {STARTPOUND}        {
+  		      	g_packageCommentAllowed = FALSE;
+			if(rdoc_compatibility) {
+			  initSpecialBlock();
+			  BEGIN(SpecialComment);
+			}
+			else {
+			  // slurp until end of line.
+			  PUSH_SC(SlurpUntilEoL);
+			}
+			bookKeeping();
+  		      }
 
   {CONSTNAME}{B}=     { // A constant definition
   		      	QCString name(yytext);
@@ -765,7 +817,7 @@ PROTECTION	  (public|protected|private)
   		        if(g_statement_ok) {
 			  QCString prot = 
 			    QCString(yytext).stripWhiteSpace();
-			  printf("Protection: %s\n", yytext);
+			  // printf("Protection: %s\n", yytext);
 			  if(prot.contains("public"))
 			    g_pending_protection = Public;
 			  else if(prot.contains("private"))
@@ -779,18 +831,20 @@ PROTECTION	  (public|protected|private)
 			  bookKeeping();
   		      }
 
-%{
-/* this should be enabled again if STARTDOCSYMS should include two ##
-   again -- but I don't think it should be the case, as compatibility
-   with rdoc is a good thing (TM)
- */
-/*
-  {POUNDCOMMENT}      {
-  		        printf("Pound comment: '%s'\n", yytext);
-  		      	g_packageCommentAllowed = FALSE;
-  		      }
-*/
-%}
+  {EBLOCK}/{WLIM}    {
+  			if(g_expression_ok) {
+			  PUSH_SC(SlurpUntilEnd);
+                        }
+			bookKeeping();
+		      }
+
+  {SBLOCK}/{WLIM}    {
+  			if(g_statement_ok) {
+			  PUSH_SC(SlurpUntilEnd);
+                        }
+			bookKeeping();
+		      }
+
 
   .                   { // any other character...
                         // This is the major default
@@ -820,6 +874,19 @@ PROTECTION	  (public|protected|private)
       			docBlock+=yytext;
 			bookKeeping();
       		      }
+    \n[ \t]*\n        { 
+    		        // a blank line results in discarding the comment
+			// in rdoc compatibility mode.
+			if(rdoc_compatibility) {
+			  docBlock = "";
+			  docBrief = "";
+          	        }
+			else {
+		          handleCommentBlock(docBlock, docBrief);
+			}
+			BEGIN(docBlockContext);
+			bookKeeping();
+      		      }
     \n		      { // new line that ends the comment
 		        handleCommentBlock(docBlock, docBrief);
 			BEGIN(docBlockContext);
@@ -842,7 +909,7 @@ PROTECTION	  (public|protected|private)
 		      }
 
   {STARTDOCSYMS}      {
-                        printf("Starting special comment inside block\n");
+                        // printf("Starting special comment inside block\n");
   		      	g_packageCommentAllowed = FALSE;
 			initSpecialBlock();
 			BEGIN(SpecialComment);
@@ -850,7 +917,18 @@ PROTECTION	  (public|protected|private)
 			bookKeeping();
                       }
 
+  {POUNDCOMMENT}      {
+			bookKeeping();
+                      }
+
   {EBLOCK}/{WLIM}    {
+  			if(g_expression_ok) {
+			  PUSH_SC(SlurpUntilEnd);
+                        }
+			bookKeeping();
+		      }
+
+  {SBLOCK}/{WLIM}    {
   			if(g_statement_ok) {
 			  PUSH_SC(SlurpUntilEnd);
                         }
@@ -978,8 +1056,8 @@ PROTECTION	  (public|protected|private)
 
   {PARAMNAME}         { // Name of parameter
 			Argument *a = new Argument;
-			printf("Found argument: %s\n",
-			       yytext);
+			//printf("Found argument: %s\n",
+			//       yytext);
 			current->argList->append(a);
 			current->argList->getLast()->name = 
 			  QCString(yytext).stripWhiteSpace();
@@ -1003,6 +1081,10 @@ PROTECTION	  (public|protected|private)
 			ABSORB_UNTIL(",)",TRUE, assignDefaultValue);
   		      }
 
+  {NEWLINE}	      {
+  		        bookKeeping();
+  		      }
+
   .                   { 
   		        printf("Warning: garbage '%s' in function "
   		               "parameters in %s:%d\n",
@@ -1016,7 +1098,7 @@ PROTECTION	  (public|protected|private)
 
 <AbsorbExpression>{
   {EBLOCK}/{WLIM}     {
-  			if(g_statement_ok) {
+  			if(g_expression_ok) {
 			  PUSH_SC(SlurpUntilEnd);
                         }
 			bookKeeping();
@@ -1096,6 +1178,19 @@ PROTECTION	  (public|protected|private)
 
 }
 
+  /* this is mostly for debugging purposes */
+
+<*>\n {
+       printf(" -> stray newline at file %s:%d\n",
+       	      (const char*) yyFileName, yyLineNr);
+       bookKeeping();
+     }
+
+<*>. {
+       printf(" -> stray character at file %s:%d\n",
+       	      (const char*) yyFileName, yyLineNr);
+       bookKeeping();
+     }
 
 
 
