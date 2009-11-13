@@ -412,7 +412,8 @@ static void enterNamespace(QCString name, QCString type)
     current->reset();
   }
   else {
-    current->section = Entry::SCOPE_MASK;
+    current->section = ( type.contains("class") ? Entry::CLASS_SEC:
+    		          Entry::NAMESPACE_SEC);
     current->argList->clear();
     current->type == type ;
     current->fileName  = yyFileName;
