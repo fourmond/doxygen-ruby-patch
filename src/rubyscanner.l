@@ -23,8 +23,9 @@
  */
 
 /*
- * This is the scanner for the Ruby language, but it is derived from the one
- * for the python language, hence the credits above.
+ * This is the scanner for the Ruby language, but it is (loosely now)
+ * derived from the one for the python language, hence the credits
+ * above.
  */
 
 %{
@@ -287,6 +288,8 @@ static void assignDefaultValue()
   }
 }
 
+static void handleCommentBlock(const QCString &,bool);
+
 // Assign a default value to the argument of current.
 static void assignConstant()
 {
@@ -294,9 +297,12 @@ static void assignConstant()
     current->initializer = g_absorbed_string;
     // printf("Assigned constant initial value: %s",
     //	   (const char *) g_absorbed_string);
+    current->initLines = 1 + g_absorbed_string.contains('\n');
+
     g_absorbed_string.resize(0);
   }
   newEntry();
+  handleCommentBlock("@}\n", FALSE);
 }
 
 // In this function, we parse a list of strings or symbols to end
@@ -514,10 +520,11 @@ static void appendDocBlock() {
 
 static void handleCommentBlock(const QCString &doc,bool brief)
 {
-  /// \todo here should come a basic rdoc-style pre-parsing of
-  /// comments, only triggered when 
   int position = 0;
   bool needsEntry;
+  if(rdoc_compatibility) {
+    // Now, we should parse the string
+  }
   while (parseCommentBlock(g_thisParser,
 	  (docBlockInBody && previous) ? previous : current,
 	  doc,     // text
@@ -542,16 +549,6 @@ static void handleCommentBlock(const QCString &doc,bool brief)
   }
 }
 
-static void endOfDef()
-{
-  if (bodyEntry)
-  {
-    bodyEntry->endBodyLine  = yyLineNr;
-    bodyEntry = 0;
-  }
-  newEntry();
-  //g_insideConstructor = FALSE;
-}
 
 static inline void addToString(const char *s)
 {
@@ -790,6 +787,7 @@ PROTECTION	  (public|protected|private)
   		      }
 
   {CONSTNAME}{B}=     { // A constant definition
+			handleCommentBlock("@{ \n @name Constants\n", FALSE);
   		      	QCString name(yytext);
 			name.resize(name.size() - 1);
   		        current->name = name.stripWhiteSpace();
@@ -799,6 +797,7 @@ PROTECTION	  (public|protected|private)
 			current->bodyLine  = yyLineNr;
 			current->section = Entry::VARIABLE_SEC;
 			current->spec = Entry::Initonly;
+			current->mGrpId = 12;
 			bookKeeping();
 			ABSORB_UNTIL("\n;",FALSE, assignConstant);
   		      }
