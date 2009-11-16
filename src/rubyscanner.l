@@ -305,25 +305,37 @@ static void assignConstant()
   handleCommentBlock("@}\n", FALSE);
 }
 
-// In this function, we parse a list of strings or symbols to end
-// up with a list of symbols.
-static QValueList<QCString> parseSymbols(QCString s)
+/// Parses the string s and returns all the substrings matching the
+/// pattern.
+static QValueList<QCString> extractPatterns(QCString s, 
+					    const char * pattern)
 {
   QString str = s;
   int idx,len;
-  QRegExp resym("[^:,'\" \t\n]+");
-  QValueList<QCString> symbols;
-  // Black magic, as for some reason the code below does not
-  // work if that isn't here...
-  const char * b = (const char *) str.local8Bit();
-  while((idx = resym.match(str, idx, &len))>=0) {
-    // printf("Match: %s %d %d\n", (const char*) str.local8Bit(),
-    // 	   idx, len);
-    QCString sym = str.mid(idx, len).local8Bit();
-    symbols.append(sym);
+  QRegExp re(pattern);
+  QValueList<QCString> values;
+  idx = 0;
+  while((idx = re.match(str, idx, &len))>=0) {
+    QCString val = str.mid(idx, len).local8Bit();
+    values.append(val);
     idx+=len;
   }
-  return symbols;
+  return values;
+}
+
+
+
+/// In this function, we parse a list of strings or symbols to end up
+/// with a list of symbols.
+static QValueList<QCString> parseSymbols(QCString s)
+{
+  return extractPatterns(s, "[^:,'\" \t\n]+");
+}
+
+/// In this function, we parse a list of constants and return their name.
+static QValueList<QCString> parseConstants(QCString s)
+{
+  return extractPatterns(s, "[^,'\" \t\n]+");
 }
 
 
@@ -383,7 +395,37 @@ static void doProtection()
   g_absorbed_string.resize(0);
 }
 
+/// The stack to save the last used value of the protection
 static QValueStack<Protection> protectionStack;
+
+
+/// Each of these strings represents a block that can potentially be
+/// included in the current class/module description.
+static QValueStack<QCString> includedModulesStack;
+
+/// Update the list of included modules
+static void doInclusion()
+{
+  /// \todo handle extend as well...
+  if(! g_absorbed_string.isEmpty()) {
+    printf("Inclusion: %s\n", (const char*) g_absorbed_string);
+    QValueList<QCString> constants = 
+      parseConstants(g_absorbed_string);
+    QCString cur;
+    if(includedModulesStack.count() < 1)
+      cur = QCString();
+    else
+      cur = includedModulesStack.pop();
+    
+    for(int i = 0; i < constants.count(); i++) {
+      cur += "<li>" + constants[i] + "</li>\n";
+    }
+    includedModulesStack.push(cur);
+    g_absorbed_string.resize(0);
+  }
+}
+
+
 
 /// Enters a new namespace, creating it based on the current entry
 /// if it does not exist, or merely copying its documentation to the
@@ -432,6 +474,7 @@ static void enterNamespace(QCString name, QCString type)
   }
 
   groupEnterCompound(yyFileName,yyLineNr,baseName + name);
+  includedModulesStack.push(QCString());
   
   if(ns->parent() != current_root)
     printf("Not automatically setting parent !\n");
@@ -446,12 +489,30 @@ static void leaveNamespace()
     // printf("Leaving namespace %s at %s:%d\n",
     // 	   (const char*) current_root->name,
     // 	   (const char*) yyFileName, yyLineNr);
+
+    // First handle the included modules:
+    if(includedModulesStack.count() >=1) {
+      QCString includedModules = includedModulesStack.pop().
+	stripWhiteSpace();
+      if(includedModules.size() > 0) {
+	/// \todo somehow, the included class should know it has been
+	/// included. I don't know how to do that, though...
+	QCString d = "\\section includes Included modules\n<ul>\n"; 
+	d += includedModules;
+	d += "</ul>";
+	Entry * saved = current;
+	current = current_root;
+	handleCommentBlock(d, FALSE);
+	current = saved;
+      }
+    }
     current_root = current_root->parent();
     if(protectionStack.count() >= 1)
       protection = protectionStack.pop();
     else
       protection = Public; // ?? should that happen ?
     groupLeaveCompound(yyFileName,yyLineNr,"");
+    current->setParent(current_root);
   }
   else {
     fprintf(stderr, "Warning: attempting to end root namespace at %s:"
@@ -649,6 +710,8 @@ POUNDCOMMENT      {B}"#"[^#\n][^\n]*
 ATTR_SPEC	  attr_(accessor|writer|reader)
 PROTECTION	  (public|protected|private)
 
+INCLUSION         (include|extend)
+
 /* emacs, please stop parsing ' */
 
 %option noyywrap
@@ -811,6 +874,18 @@ PROTECTION	  (public|protected|private)
 			}
 			else 
 			  bookKeeping();
+  		      }
+
+  {INCLUSION}/{WLIM}  {
+  		        if(g_statement_ok) {
+			  printf("Do stuff about inclusion\n");
+  		          bookKeeping();
+		          ABSORB_UNTIL("\n;",FALSE, doInclusion);
+			}
+			else {
+			  printf("Would have done stuff about inclusion\n");
+			  bookKeeping();
+			}
   		      }
 
   {PROTECTION}/{WLIM}  {
