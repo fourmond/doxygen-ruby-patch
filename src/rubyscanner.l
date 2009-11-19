@@ -122,6 +122,11 @@ static bool             g_packageCommentAllowed;
 // The current "extension" in use: (extends/include?)
 static QCString         g_extension;
 
+/// Stopper for here-documents.
+static QCString         g_heredoc_marker;
+static bool 		g_pending_heredoc;
+static int 		hereDocContext;
+
 // Push_pop start conditions
 QValueStack<int>        g_sc_stack;
 
@@ -165,9 +170,18 @@ static void oneCharBookKeeping(char ch)
     else if(! (ch == ' ' || ch == '\t'))
       g_statement_ok = FALSE;
   }
-  if(ch == '\n')
+  if(ch == '\n') {
     yyLineNr++;
-  if(strchr("*,+-/.\\", ch))
+    if(g_pending_heredoc) {
+      printf("Starting here doc until '%s' at %s:%d\n", 
+	     (const char*) g_heredoc_marker,
+	     (const char*) yyFileName,
+	     yyLineNr);
+      PUSH_SC(hereDocContext);
+      g_pending_heredoc = FALSE;
+    }
+  }
+  if(strchr("*,+-/.\\<>", ch))
     g_can_end = FALSE;
   else
     g_can_end = TRUE;
@@ -192,6 +206,7 @@ static void bookKeeping()
 static void initParser()
 {
   rdoc_compatibility = Config_getBool("RUBY_RDOC_COMPATIBILITY");
+  g_pending_heredoc = FALSE;
   protection = Public;
   mtype = Method;
   gstat = FALSE;
@@ -293,8 +308,8 @@ static void assignConstant()
 {
   if(! g_absorbed_string.isEmpty()) {
     current->initializer = g_absorbed_string;
-    // printf("Assigned constant initial value: %s",
-    //	   (const char *) g_absorbed_string);
+    printf("Assigned constant initial value: %s",
+    	   (const char *) g_absorbed_string);
     current->initLines = 1 + g_absorbed_string.contains('\n');
 
     g_absorbed_string.resize(0);
@@ -720,6 +735,7 @@ ATTR_SPEC	  attr_(accessor|writer|reader)
 PROTECTION	  (public|protected|private)
 
 INCLUSION         (include|extend)
+HEREDOC           <<-?['"]?({LETTER}|{DIGIT}|"_")+['"]?
 
 /* emacs, please stop parsing ' */
 
@@ -755,10 +771,11 @@ INCLUSION         (include|extend)
 
 %x SingleQuotedString
 %x DoubleQuotedString
+%x HereDoc
 
   /* expression state */
 
-%x AbsorbExpression
+%x AbsorbExpression 
 
   /* import */
 
@@ -771,6 +788,25 @@ INCLUSION         (include|extend)
 
   /* ------------ String Catchalls  -------------- */
 <Search,SlurpUntilEnd,AbsorbExpression>{
+  {HEREDOC} 	      {
+  		        if(g_can_end) {
+			  hereDocContext = HereDoc;
+			  QCString str = yytext;
+			  str.stripPrefix("<<");
+			  str = str.stripWhiteSpace();
+			  str.stripPrefix("-");
+			  str.stripPrefix("'");
+			  str.stripPrefix("\"");
+			  if(str.contains('\'') || str.contains('"'))
+			    str = str.left(str.size() - 2);
+			  g_heredoc_marker = str.stripWhiteSpace();
+			  g_pending_heredoc = TRUE;
+			  printf("Found pending here document: %s\n",
+				 (const char*) g_heredoc_marker);
+			}
+			bookKeeping();
+			// it will only trigger at end of line...
+  		      }
   "'"		      {
   		        PUSH_SC(SingleQuotedString);
 			bookKeeping();
@@ -780,6 +816,17 @@ INCLUSION         (include|extend)
   		        PUSH_SC(DoubleQuotedString);
 			bookKeeping();
 		      }
+}
+
+<HereDoc>{
+  .*{NEWLINE} 	      {
+ 		        QCString line = QCString(yytext).stripWhiteSpace();
+ 			if(g_heredoc_marker == line) {
+			  POP_SC;
+                        }
+            		printf("Within here-doc: %s", yytext);
+			bookKeeping();
+ 		      }
 }
 
 <SlurpUntilEoL>{
@@ -1203,9 +1250,11 @@ INCLUSION         (include|extend)
   		      }
 
   .|\n		      {
-  		        if(g_can_end && 
-			  strchr(g_expression_delimiters.last(),*yytext)) {
-			  if(g_expression_delimiters.count() == 1) {
+  		        // This will segfault if we run out of the
+			// g_expression_delimiters stack, but it
+  		        // should never happen
+  		        if(g_can_end && strchr(g_expression_delimiters.last(),*yytext)) {
+			  if(g_expression_delimiters.count() <= 1) {
   		            stopAbsorbing();
 			    if(g_keep_last)
 			      yyless(0); // and we push back
