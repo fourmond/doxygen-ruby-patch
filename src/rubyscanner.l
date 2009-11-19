@@ -109,12 +109,6 @@ static int              g_curIndent = 0;
 static QDict<QCString>  g_packageNameCache(257);
 static QCString         g_packageScope;
 
-static char             g_atomStart;
-static char             g_atomEnd;
-static int              g_atomCount;
-
-//static bool             g_insideConstructor;
-
 static QCString         g_packageName;
 
 static bool             g_hideClassDocs;
@@ -124,6 +118,9 @@ static int              g_braceCount;
 
 static bool             g_lexInit = FALSE;
 static bool             g_packageCommentAllowed;
+
+// The current "extension" in use: (extends/include?)
+static QCString         g_extension;
 
 // Push_pop start conditions
 QValueStack<int>        g_sc_stack;
@@ -406,19 +403,23 @@ static QValueStack<QCString> includedModulesStack;
 /// Update the list of included modules
 static void doInclusion()
 {
-  /// \todo handle extend as well...
   if(! g_absorbed_string.isEmpty()) {
     printf("Inclusion: %s\n", (const char*) g_absorbed_string);
     QValueList<QCString> constants = 
       parseConstants(g_absorbed_string);
     QCString cur;
+    QCString what;
+    if(g_extension == "include")
+      what = " (included)";
+    else
+      what = " (extended)";
     if(includedModulesStack.count() < 1)
       cur = QCString();
     else
       cur = includedModulesStack.pop();
     
     for(int i = 0; i < constants.count(); i++) {
-      cur += "<li>" + constants[i] + "</li>\n";
+      cur += "<li>" + constants[i] + what + "</li>\n";
     }
     includedModulesStack.push(cur);
     g_absorbed_string.resize(0);
@@ -570,25 +571,59 @@ static void startCommentBlock(bool brief)
   }
 }
 
-/*
-static void appendDocBlock() {
-  previous = current;
-  current_root->addSubEntry(current);
-  current = new Entry;
-  initEntry();
+/// Looks for a given pattern in the given string, and replace the
+/// length first and last characters with the strings before and
+/// after.
+static QCString replaceInString(const char * regex, const QCString &str,
+				int lb, const char * before,
+				int la, const char * after)
+{
+  QRegExp re(regex);
+  QString s = str;
+  QString b = before;
+  QString a = after;
+  int index = 0;
+  int len = 0;
+  while(index = re.match(s,index,&len, index == 0),index >= 0) {
+    s.replace(index + len - la, la, QString(after));
+    s.replace(index, lb, QString(before));
+    index += len + a.length() + b.length() - lb - la;
+  }
+  return QCString(s);
 }
-*/
+			    
+
+
+/// Takes a doc string and translates basic rdoc comments into
+static QCString translateRDocCommands(const QCString &doc)
+{
+  QCString d = doc;
+  // Now, we preprocess the input...
+  d = replaceInString("[ \t]\\*[a-zA-Z_0-9]+[!=?]?\\*", d,
+		      2, " <b>", 1, "</b> ");
+  d = replaceInString("[ \t]_[a-zA-Z_0-9]+[!=?]?_", d,
+		      2, " \\a ", 1, " ");
+  d = replaceInString("[ \t]\\+[a-zA-Z_0-9]+[!=?]?\\+", d,
+		      2, " \\p ", 1, " ");
+
+  // Now, the fun is to prepare the ground for itemized lists: we
+  // simply add a newline before ?
+  d.replace(QRegExp("[ \\t]+\\*"), " \\li");
+  // Regular expressions are slightly primitive...
+  return d;
+}
 
 static void handleCommentBlock(const QCString &doc,bool brief)
 {
   int position = 0;
   bool needsEntry;
+  QCString d = doc;
   if(rdoc_compatibility) {
-    // Now, we should parse the string
+    d = translateRDocCommands(d);
   }
   while (parseCommentBlock(g_thisParser,
 	  (docBlockInBody && previous) ? previous : current,
-	  doc,     // text
+	  d,     // text
 	  yyFileName, // file
 	  brief ? current->briefLine : current->docLine,   // line of block start
 	  docBlockInBody ? FALSE : brief, 
@@ -610,34 +645,6 @@ static void handleCommentBlock(const QCString &doc,bool brief)
   }
 }
 
-
-static inline void addToString(const char *s)
-{
-  if (g_copyString) (*g_copyString)+=s;
-}
-
-static void initTriDoubleQuoteBlock()
-{
-  docBlockContext   = YY_START;
-  docBlockInBody    = FALSE;
-  docBlockJavaStyle = TRUE;
-  docBlockSpecial   = yytext[3]=='!';
-  docBlock.resize(0);
-  g_doubleQuote = TRUE;
-  startCommentBlock(FALSE);
-}
-
-static void initTriSingleQuoteBlock()
-{
-  docBlockContext   = YY_START;
-  docBlockInBody    = FALSE;
-  docBlockJavaStyle = TRUE;
-  docBlockSpecial   = yytext[3]=='!';
-  docBlock.resize(0);
-  g_doubleQuote = FALSE;
-  startCommentBlock(FALSE);
-}
-
 static void initSpecialBlock()
 {
   docBlockContext   = YY_START;
@@ -647,6 +654,7 @@ static void initSpecialBlock()
   docBlock.resize(0);
   startCommentBlock(TRUE);
 }
+
 
 //-----------------------------------------------------------------------------
 /* ----------------------------------------------------------------- */
@@ -878,12 +886,11 @@ INCLUSION         (include|extend)
 
   {INCLUSION}/{WLIM}  {
   		        if(g_statement_ok) {
-			  printf("Do stuff about inclusion\n");
+			  g_extension = QCString(yytext).stripWhiteSpace();
   		          bookKeeping();
 		          ABSORB_UNTIL("\n;",FALSE, doInclusion);
 			}
 			else {
-			  printf("Would have done stuff about inclusion\n");
 			  bookKeeping();
 			}
   		      }
