@@ -27,9 +27,9 @@
 
 #include "parserintf.h"
 
-/** \brief Python Language parser using state-based lexical scanning.
+/** \brief Ruby Language parser using state-based lexical scanning.
  *
- * This is the Python language parser for doxygen.
+ * This is the Ruby language parser for doxygen.
  */
 class RubyLanguageScanner : public ParserInterface
 {
