@@ -194,9 +194,11 @@ static void oneCharBookKeeping(char ch)
 // This function *must* be called at the end of every single rule !
 static void bookKeeping()
 {
+  // for(int i = 0; i < g_sc_stack.count(); i++)
+  //   printf("%s%d", i ? "," : "\n -> ", g_sc_stack[i]);
+  // printf(",%d: '%s'\n", YY_START, yytext);
   for( const char* c = yytext ; *c ; ++c )
     oneCharBookKeeping(*c);
-  printf("Condition %d: '%s'\n", YY_START, yytext);
 }
 
 
@@ -308,8 +310,8 @@ static void assignConstant()
 {
   if(! g_absorbed_string.isEmpty()) {
     current->initializer = g_absorbed_string;
-    printf("Assigned constant initial value: %s",
-    	   (const char *) g_absorbed_string);
+    // printf("Assigned constant initial value: %s",
+    // 	   (const char *) g_absorbed_string);
     current->initLines = 1 + g_absorbed_string.contains('\n');
 
     g_absorbed_string.resize(0);
@@ -789,6 +791,8 @@ HEREDOC           <<-?['"]?({LETTER}|{DIGIT}|"_")+['"]?
   /* ------------ String Catchalls  -------------- */
 <Search,SlurpUntilEnd,AbsorbExpression>{
   {HEREDOC} 	      {
+  		        printf("Current condition: %d -- '%s'\n", 
+			       YY_START,yytext);
   		        if(g_can_end) {
 			  hereDocContext = HereDoc;
 			  QCString str = yytext;
@@ -819,14 +823,16 @@ HEREDOC           <<-?['"]?({LETTER}|{DIGIT}|"_")+['"]?
 }
 
 <HereDoc>{
-  .*{NEWLINE} 	      {
+  .* 	              {
  		        QCString line = QCString(yytext).stripWhiteSpace();
  			if(g_heredoc_marker == line) {
 			  POP_SC;
                         }
-            		printf("Within here-doc: %s", yytext);
-			bookKeeping();
+ 			bookKeeping();
  		      }
+  {NEWLINE}           { // so that newlines are not taken into account.
+ 			bookKeeping();
+		      }
 }
 
 <SlurpUntilEoL>{
@@ -1251,9 +1257,15 @@ HEREDOC           <<-?['"]?({LETTER}|{DIGIT}|"_")+['"]?
 
   .|\n		      {
   		        // This will segfault if we run out of the
-			// g_expression_delimiters stack, but it
+  		        // g_expression_delimiters stack, but it
   		        // should never happen
-  		        if(g_can_end && strchr(g_expression_delimiters.last(),*yytext)) {
+			if(yytext[0] == '\n' && g_pending_heredoc)
+			  bookKeeping();
+			else if(g_can_end && 
+			        strchr(g_expression_delimiters.last(),*yytext)) {
+			  // comes first, to avoid problems with
+			  // bookkeeping
+  		          POP_SC;
 			  if(g_expression_delimiters.count() <= 1) {
   		            stopAbsorbing();
 			    if(g_keep_last)
@@ -1265,7 +1277,6 @@ HEREDOC           <<-?['"]?({LETTER}|{DIGIT}|"_")+['"]?
 			    g_expression_delimiters.pop();
 			    bookKeeping();
 			  }
-  		          POP_SC;
 			}
 			else
 			  bookKeeping();
@@ -1512,6 +1523,7 @@ void RubyLanguageScanner::parseCode(CodeOutputInterface &codeOutIntf,
   /** 
       \todo Write a code scanner, when I know how to write one.
   */
+  printf("Should be parsing code: %s\n", (const char*) input);
 }
 
 void RubyLanguageScanner::parsePrototype(const char *text)
