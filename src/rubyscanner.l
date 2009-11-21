@@ -136,59 +136,82 @@ QValueStack<int>        g_sc_stack;
 		   	    (const char *)yyFileName,yyLineNr);    \
 			  BEGIN(Search);}}
 
-/// \todo a configuration value should offer the possibility to prefer
-/// a 'rdoc-compatible' mode where all comments are taken into
-/// account, but a blank line discards previous contents, and a
-/// 'normal' mode resembling the usual C++ one: nothing gets into the
-/// documentatin unless you ask for it with a specific format of the
-/// comments.
-
 //////////////////////////////////////////////////////////////////////
 // Bookkeeping
+void RubyLanguageScanner::ScannerContext::reset()
+{
+  newLineOK = TRUE;
+  pendingBackspace = FALSE;
+  definitionOK = TRUE;
+  expressionOK = TRUE;
+  surelyExpression = FALSE;
+  ifNewBlock = TRUE;
+  noDefinition = FALSE;
+  canEndExpression = FALSE;
+}
 
-// Whether or not next end/def/class statement can be taken into account
-static bool             g_statement_ok; 
-// Whether or not the next thing can start an expression.
-static bool             g_expression_ok; // OK to start an expression
-// OK to finish an "expression" on a newline (excludes opening if and so on)?
-static bool 		g_can_end; 
+void RubyLanguageScanner::ScannerContext::parseOneChar(char ch)
+{
+  // First, can we start an expression ?
+  if(isalnum(ch) || ch == '_' || ch == '?' || ch == '!')
+    expressionOK = FALSE;
+  else
+    expressionOK = TRUE;
+
+  // Eliminate a few cases where a definition cannot start
+  if(strchr("*,+-/<>=(", ch)) 
+    noDefinition = TRUE;
+  else if(isblank(ch) && noDefinition)
+    noDefinition = TRUE;
+  else
+    noDefinition = FALSE;
+
+  if(ch == ';' || (ch == '\n' && ! pendingBackspace))
+    definitionOK = TRUE;
+  else if(isblank(ch) && definitionOK)
+    definitionOK = TRUE;
+  else
+    definitionOK = FALSE;
+
+  surelyExpression = (noDefinition || definitionOK);
+
+ 
+  if(ch == '\\') 
+    pendingBackspace = ! pendingBackspace;
+  else
+    pendingBackspace = FALSE;
+
+  newLineOK = ! (noDefinition || pendingBackspace);
+  ifNewBlock = surelyExpression;
+
+  canEndExpression = newLineOK;
+}
+
+
+
+/// The context
+static RubyLanguageScanner::ScannerContext context;
+
 static bool		g_absorb_string;
 static void 		(*g_absorb_hook)();
 static QCString		g_absorbed_string;
 
 static void oneCharBookKeeping(char ch)
 {
-  if(isalnum(ch) || ch == '_' || ch == '?' || ch == '!')
-    g_expression_ok = FALSE;
-  else
-    g_expression_ok = TRUE;
-  if(! g_expression_ok)
-    g_statement_ok = FALSE;
-  else {
-    if(ch == '\n' || ch == ';')
-      g_statement_ok = TRUE;
-    else if(! (ch == ' ' || ch == '\t'))
-      g_statement_ok = FALSE;
-  }
+  context.parseOneChar(ch);
   if(ch == '\n') {
     yyLineNr++;
     if(g_pending_heredoc) {
-      printf("Starting here doc until '%s' at %s:%d\n", 
-	     (const char*) g_heredoc_marker,
-	     (const char*) yyFileName,
-	     yyLineNr);
+      // printf("Starting here doc until '%s' at %s:%d\n", 
+      // 	     (const char*) g_heredoc_marker,
+      // 	     (const char*) yyFileName,
+      // 	     yyLineNr);
       PUSH_SC(hereDocContext);
       g_pending_heredoc = FALSE;
     }
   }
-  if(strchr("*,+-/.\\<>", ch))
-    g_can_end = FALSE;
-  else
-    g_can_end = TRUE;
   if(g_absorb_string)
     g_absorbed_string += ch;
-//  if(g_absorb_string)
-//    printf("Absorbing: %s\n", (const char*)g_absorbed_string);
 }
 
 // This function *must* be called at the end of every single rule !
@@ -216,11 +239,10 @@ static void initParser()
   previous = 0;
   g_packageCommentAllowed = TRUE;
   g_packageNameCache.setAutoDelete(TRUE);
-  g_statement_ok = TRUE;
-  g_expression_ok = TRUE;
-  g_can_end = TRUE;
   g_absorb_string = FALSE;
   g_absorb_hook = 0;
+
+  context.reset();
 }
 
 static void initEntry()
@@ -422,7 +444,7 @@ static QValueStack<QCString> includedModulesStack;
 static void doInclusion()
 {
   if(! g_absorbed_string.isEmpty()) {
-    printf("Inclusion: %s\n", (const char*) g_absorbed_string);
+    // printf("Inclusion: %s\n", (const char*) g_absorbed_string);
     QValueList<QCString> constants = 
       parseConstants(g_absorbed_string);
     QCString cur;
@@ -791,9 +813,10 @@ HEREDOC           <<-?['"]?({LETTER}|{DIGIT}|"_")+['"]?
   /* ------------ String Catchalls  -------------- */
 <Search,SlurpUntilEnd,AbsorbExpression>{
   {HEREDOC} 	      {
-  		        printf("Current condition: %d -- '%s'\n", 
-			       YY_START,yytext);
-  		        if(g_can_end) {
+  		        // printf("Current condition: %d -- '%s'\n", 
+			//        YY_START,yytext);
+  		        // if(g_can_end)  // Why ??
+  		        if(1) { 
 			  hereDocContext = HereDoc;
 			  QCString str = yytext;
 			  str.stripPrefix("<<");
@@ -811,6 +834,7 @@ HEREDOC           <<-?['"]?({LETTER}|{DIGIT}|"_")+['"]?
 			bookKeeping();
 			// it will only trigger at end of line...
   		      }
+
   "'"		      {
   		        PUSH_SC(SingleQuotedString);
 			bookKeeping();
@@ -850,7 +874,7 @@ HEREDOC           <<-?['"]?({LETTER}|{DIGIT}|"_")+['"]?
 <Search>{
 
   (class|module)/{WLIM} { // class definition
-			if(g_statement_ok) {
+			if(context.definitionOK) {
 			  g_namespace_kind =
 			    QCString(yytext).stripWhiteSpace();
 			  BEGIN(ClassDec);
@@ -864,7 +888,7 @@ HEREDOC           <<-?['"]?({LETTER}|{DIGIT}|"_")+['"]?
     		      }
 
   "def"{BB}           { // start of a function/method definition
-	      	        if(g_statement_ok) {
+	      	        if(context.definitionOK) {
 			  current->fileName  = yyFileName;
 			  current->startLine = yyLineNr;
 			  current->bodyLine  = yyLineNr;
@@ -888,7 +912,7 @@ HEREDOC           <<-?['"]?({LETTER}|{DIGIT}|"_")+['"]?
                       }
 
   "end"               {
-  		        if(g_statement_ok)
+  		        if(context.definitionOK)
   		          leaveNamespace();
 			bookKeeping();
 		      }	
@@ -923,14 +947,13 @@ HEREDOC           <<-?['"]?({LETTER}|{DIGIT}|"_")+['"]?
 			current->startLine = yyLineNr;
 			current->bodyLine  = yyLineNr;
 			current->section = Entry::VARIABLE_SEC;
-			current->spec = Entry::Initonly;
-			current->mGrpId = 12;
+			current->spec = Entry::Final;
 			bookKeeping();
 			ABSORB_UNTIL("\n;",FALSE, assignConstant);
   		      }
 
   {ATTR_SPEC}/{WLIM}  {
-  		        if(g_statement_ok) {
+  		        if(context.definitionOK) {
   		          g_attribute_function = 
 			    QCString(yytext).stripWhiteSpace();
   		          bookKeeping();
@@ -941,7 +964,7 @@ HEREDOC           <<-?['"]?({LETTER}|{DIGIT}|"_")+['"]?
   		      }
 
   {INCLUSION}/{WLIM}  {
-  		        if(g_statement_ok) {
+  		        if(context.definitionOK) {
 			  g_extension = QCString(yytext).stripWhiteSpace();
   		          bookKeeping();
 		          ABSORB_UNTIL("\n;",FALSE, doInclusion);
@@ -952,7 +975,7 @@ HEREDOC           <<-?['"]?({LETTER}|{DIGIT}|"_")+['"]?
   		      }
 
   {PROTECTION}/{WLIM}  {
-  		        if(g_statement_ok) {
+  		        if(context.definitionOK) {
 			  QCString prot = 
 			    QCString(yytext).stripWhiteSpace();
 			  // printf("Protection: %s\n", yytext);
@@ -970,14 +993,14 @@ HEREDOC           <<-?['"]?({LETTER}|{DIGIT}|"_")+['"]?
   		      }
 
   {EBLOCK}/{WLIM}    {
-  			if(g_expression_ok) {
+  			if(context.expressionOK) {
 			  PUSH_SC(SlurpUntilEnd);
                         }
 			bookKeeping();
 		      }
 
   {SBLOCK}/{WLIM}    {
-  			if(g_statement_ok) {
+  			if(context.ifNewBlock) {
 			  PUSH_SC(SlurpUntilEnd);
                         }
 			bookKeeping();
@@ -1040,7 +1063,7 @@ HEREDOC           <<-?['"]?({LETTER}|{DIGIT}|"_")+['"]?
   /* When in this state, we ignore everything until the matching end */
 <SlurpUntilEnd>{
   "end"/{WLIM}        {	
-  		        if(g_statement_ok) {
+  		        if(context.definitionOK) {
 			  POP_SC;
 			}
 			bookKeeping();
@@ -1060,14 +1083,14 @@ HEREDOC           <<-?['"]?({LETTER}|{DIGIT}|"_")+['"]?
                       }
 
   {EBLOCK}/{WLIM}    {
-  			if(g_expression_ok) {
+  			if(context.expressionOK) {
 			  PUSH_SC(SlurpUntilEnd);
                         }
 			bookKeeping();
 		      }
 
   {SBLOCK}/{WLIM}    {
-  			if(g_statement_ok) {
+  			if(context.ifNewBlock) {
 			  PUSH_SC(SlurpUntilEnd);
                         }
 			bookKeeping();
@@ -1236,7 +1259,13 @@ HEREDOC           <<-?['"]?({LETTER}|{DIGIT}|"_")+['"]?
 
 <AbsorbExpression>{
   {EBLOCK}/{WLIM}     {
-  			if(g_expression_ok) {
+  			if(context.expressionOK) {
+			  PUSH_SC(SlurpUntilEnd);
+                        }
+			bookKeeping();
+		      }
+  {SBLOCK}/{WLIM}     {
+  			if(context.ifNewBlock) {
 			  PUSH_SC(SlurpUntilEnd);
                         }
 			bookKeeping();
@@ -1261,7 +1290,7 @@ HEREDOC           <<-?['"]?({LETTER}|{DIGIT}|"_")+['"]?
   		        // should never happen
 			if(yytext[0] == '\n' && g_pending_heredoc)
 			  bookKeeping();
-			else if(g_can_end && 
+			else if(context.canEndExpression && 
 			        strchr(g_expression_delimiters.last(),*yytext)) {
 			  // comes first, to avoid problems with
 			  // bookkeeping
@@ -1289,7 +1318,8 @@ HEREDOC           <<-?['"]?({LETTER}|{DIGIT}|"_")+['"]?
 <SingleQuotedString>{
 
   "'"		      {
-  		        POP_SC;
+			if(! context.pendingBackspace)
+  		          POP_SC;
 			bookKeeping();
 		      }
 
@@ -1308,12 +1338,9 @@ HEREDOC           <<-?['"]?({LETTER}|{DIGIT}|"_")+['"]?
 
 <DoubleQuotedString>{
 
-  \\\"		      {
-  		        bookKeeping();
-  		      }
-
   \"		      {
-  		        POP_SC;
+			if(! context.pendingBackspace)
+  		          POP_SC;
 			bookKeeping();
   		      }
 
