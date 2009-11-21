@@ -182,6 +182,7 @@ static void bookKeeping()
 {
   for( const char* c = yytext ; *c ; ++c )
     oneCharBookKeeping(*c);
+  printf("Condition %d: '%s'\n", YY_START, yytext);
 }
 
 
@@ -840,6 +841,8 @@ INCLUSION         (include|extend)
 		      }	
 
   {STARTDOCSYMS}      {
+			initSpecialBlock();
+			BEGIN(SpecialComment);
 			bookKeeping();
                       }
 
