@@ -378,7 +378,7 @@ static QValueList<QCString> parseConstants(QCString s)
 
 static QCString g_attribute_function;
 
-// Assign a default value to the argument of current.
+/// Assign a default value to the argument of current.
 static void doAttributes()
 {
   if(! g_absorbed_string.isEmpty()) {
@@ -465,6 +465,38 @@ static void doInclusion()
     g_absorbed_string.resize(0);
   }
 }
+
+/// Creates an alias
+static void doAlias()
+{
+  QValueList<QCString> symbols = 
+    parseSymbols(g_absorbed_string);
+  if(symbols.count() == 2) {
+    printf("Alias %s for %s\n", (const char*)symbols[0],
+    	   (const char*)symbols[1]);
+    handleCommentBlock(QCString("Alias for #") + symbols[1],FALSE);
+    current->fileName  = yyFileName;
+    current->startLine = yyLineNr;
+    current->bodyLine  = yyLineNr;
+    current->section = Entry::FUNCTION_SEC;
+    current->protection = protection;
+    current->objc = FALSE;
+    current->virt = Normal;
+    current->stat = FALSE;
+    current->mtype = mtype = Method;
+    current->type = "alias";
+    current->name = symbols[0];
+    current->args.resize(0);
+    current->argList->clear();
+    newEntry();
+  }
+  else {
+    fprintf(stderr, "Wrong number of arguments for alias at: %s:%d\n",
+	    (const char *) yyFileName, yyLineNr);
+  }
+  g_absorbed_string.resize(0);
+}
+
 
 
 
@@ -752,10 +784,12 @@ EBLOCK	     	  begin|proc|do|for|def|case|module|class({B}<<)?
 STARTDOCSYMS      ^{B}"#"#+
 STARTPOUND        ^{B}"#"/[^#\n]
 POUNDCOMMENT      {B}"#"[^#\n][^\n]* 
+YIELDSTATEMENT    yield{B}[^;\n]*
 
      /* attribute specifiers */
 
 ATTR_SPEC	  attr_(accessor|writer|reader)
+ALIAS	          alias(_method)?
 PROTECTION	  (public|protected|private)
 
 INCLUSION         (include|extend)
@@ -903,8 +937,6 @@ HEREDOC           <<-?['"]?({LETTER}|{DIGIT}|"_")+['"]?
 			  current->bodyLine  = yyLineNr;
 			  current->section = Entry::FUNCTION_SEC;
 			  current->protection = protection;
-			  /// @todo: keep protection information
-			  /// for nested classes
 			  current->objc = FALSE;
 			  current->virt = Normal;
 			  current->stat = FALSE;
@@ -919,7 +951,7 @@ HEREDOC           <<-?['"]?({LETTER}|{DIGIT}|"_")+['"]?
 			}
 			else {
 			  printf("Potentially missing function def "
-				 "at %s:%d", (const char*) yyFileName,
+				 "at %s:%d\n", (const char*) yyFileName,
 				 yyLineNr);
 			}
 			bookKeeping();
@@ -973,6 +1005,15 @@ HEREDOC           <<-?['"]?({LETTER}|{DIGIT}|"_")+['"]?
 			    QCString(yytext).stripWhiteSpace();
   		          bookKeeping();
 		          ABSORB_UNTIL("\n;",FALSE, doAttributes);
+			}
+			else 
+			  bookKeeping();
+  		      }
+
+  {ALIAS}/{WLIM}      {
+  		        if(context.definitionOK) {
+  		          bookKeeping();
+		          ABSORB_UNTIL("\n;",FALSE, doAlias);
 			}
 			else 
 			  bookKeeping();
@@ -1090,6 +1131,22 @@ HEREDOC           <<-?['"]?({LETTER}|{DIGIT}|"_")+['"]?
 			}
 			bookKeeping();
 		      }
+
+  {YIELDSTATEMENT}    {
+  		        if(context.expressionOK && 
+			  previous->section == Entry::FUNCTION_SEC) {
+  		          bool save = docBlockInBody;
+			  docBlockInBody = TRUE;
+			  QCString d = "\\b Yields:\n";
+			  d += "\\verbatim\n";
+			  d += yytext; 
+			  d += "\n\\endverbatim";
+			  handleCommentBlock(d, FALSE);
+			  docBlockInBody = save;
+			}
+			bookKeeping();
+                      }
+  
 
   {STARTDOCSYMS}      {
                         // printf("Starting special comment inside block\n");
