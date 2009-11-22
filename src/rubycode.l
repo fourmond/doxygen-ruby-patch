@@ -28,6 +28,7 @@
 #include <qvaluestack.h>
 
 #include "rubycode.h"
+#include "rubyscanner.h"
 #include "message.h"
 
 #include "scanner.h"

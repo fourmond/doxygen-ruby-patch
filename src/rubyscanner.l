@@ -1078,6 +1078,13 @@ HEREDOC           <<-?['"]?({LETTER}|{DIGIT}|"_")+['"]?
   /* When in this state, we ignore everything until the matching end */
 <SlurpUntilEnd>{
   "end"/{WLIM}        {	
+                        /// \todo we should parse two additional
+                        /// things here: yield statements (that should
+                        /// be added to the documentation, using
+                        /// docBlockInBody = TRUE), and globak
+                        /// variables (this should end up at
+                        /// top-level, such as where string parsing
+                        /// occurs)
   		        if(context.definitionOK) {
 			  POP_SC;
 			}
