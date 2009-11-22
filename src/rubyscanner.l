@@ -952,17 +952,17 @@ HEREDOC           <<-?['"]?({LETTER}|{DIGIT}|"_")+['"]?
   		      }
 
   {CONSTNAME}{B}=     { // A constant definition
-			// handleCommentBlock("@{ \n @name Constants\n", FALSE);
   		      	QCString name(yytext);
 			name.resize(name.size() - 1);
   		        current->name = name.stripWhiteSpace();
-			current->protection = Public;
+			current->protection = Public; // always public
 			current->fileName  = yyFileName;
 			current->startLine = yyLineNr;
 			current->bodyLine  = yyLineNr;
 			current->section = Entry::VARIABLE_SEC;
 			current->spec = Entry::Final | Entry::Sealed;
-			// current->spec = Entry::Initonly;
+  			if(g_namespace_kind == "class")
+  			  current->stat = TRUE;
 			bookKeeping();
 			ABSORB_UNTIL("\n;",FALSE, assignConstant);
   		      }
