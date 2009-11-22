@@ -153,13 +153,13 @@ void RubyLanguageScanner::ScannerContext::reset()
 void RubyLanguageScanner::ScannerContext::parseOneChar(char ch)
 {
   // First, can we start an expression ?
-  if(isalnum(ch) || ch == '_' || ch == '?' || ch == '!')
+  if(isalnum(ch) || strchr("_.", ch))
     expressionOK = FALSE;
   else
     expressionOK = TRUE;
 
   // Eliminate a few cases where a definition cannot start
-  if(strchr("*,+-/<>=(", ch)) 
+  if(strchr("*,+-/<>=(~", ch)) 
     noDefinition = TRUE;
   else if(isblank(ch) && noDefinition)
     noDefinition = TRUE;
@@ -339,7 +339,7 @@ static void assignConstant()
     g_absorbed_string.resize(0);
   }
   newEntry();
-  handleCommentBlock("@}\n", FALSE);
+  // handleCommentBlock("@}\n", FALSE);
 }
 
 /// Parses the string s and returns all the substrings matching the
@@ -747,7 +747,7 @@ WLIM   	  	  [^[:alnum:]!?_]
       /* the ones that must start with a statement */
 SBLOCK	     	  if|while|until|unless
       /* the ones for which we don't care too much */
-EBLOCK	     	  begin|proc|do|for|def|case|module|class
+EBLOCK	     	  begin|proc|do|for|def|case|module|class({B}<<)?
 
 STARTDOCSYMS      ^{B}"#"#+
 STARTPOUND        ^{B}"#"/[^#\n]
@@ -761,7 +761,7 @@ PROTECTION	  (public|protected|private)
 INCLUSION         (include|extend)
 HEREDOC           <<-?['"]?({LETTER}|{DIGIT}|"_")+['"]?
 
-/* emacs, please stop parsing ' */
+/* emacs, please stop parsing */
 
 %option noyywrap
 
@@ -796,6 +796,7 @@ HEREDOC           <<-?['"]?({LETTER}|{DIGIT}|"_")+['"]?
 %x SingleQuotedString
 %x DoubleQuotedString
 %x HereDoc
+%x Regexp
 
   /* expression state */
 
@@ -828,8 +829,8 @@ HEREDOC           <<-?['"]?({LETTER}|{DIGIT}|"_")+['"]?
 			    str = str.left(str.size() - 2);
 			  g_heredoc_marker = str.stripWhiteSpace();
 			  g_pending_heredoc = TRUE;
-			  printf("Found pending here document: %s\n",
-				 (const char*) g_heredoc_marker);
+			  // printf("Found pending here document: %s\n",
+			  // 	 (const char*) g_heredoc_marker);
 			}
 			bookKeeping();
 			// it will only trigger at end of line...
@@ -844,6 +845,14 @@ HEREDOC           <<-?['"]?({LETTER}|{DIGIT}|"_")+['"]?
   		        PUSH_SC(DoubleQuotedString);
 			bookKeeping();
 		      }
+
+  "/"		      {
+  		        if(context.surelyExpression) {
+  		          PUSH_SC(Regexp);
+			}
+			bookKeeping();
+		      }
+
 }
 
 <HereDoc>{
@@ -908,6 +917,11 @@ HEREDOC           <<-?['"]?({LETTER}|{DIGIT}|"_")+['"]?
 			  docBlockInBody = FALSE;
 			  BEGIN( FunctionDec );
 			}
+			else {
+			  printf("Potentially missing function def "
+				 "at %s:%d", (const char*) yyFileName,
+				 yyLineNr);
+			}
 			bookKeeping();
                       }
 
@@ -938,7 +952,7 @@ HEREDOC           <<-?['"]?({LETTER}|{DIGIT}|"_")+['"]?
   		      }
 
   {CONSTNAME}{B}=     { // A constant definition
-			handleCommentBlock("@{ \n @name Constants\n", FALSE);
+			// handleCommentBlock("@{ \n @name Constants\n", FALSE);
   		      	QCString name(yytext);
 			name.resize(name.size() - 1);
   		        current->name = name.stripWhiteSpace();
@@ -947,7 +961,8 @@ HEREDOC           <<-?['"]?({LETTER}|{DIGIT}|"_")+['"]?
 			current->startLine = yyLineNr;
 			current->bodyLine  = yyLineNr;
 			current->section = Entry::VARIABLE_SEC;
-			current->spec = Entry::Final;
+			current->spec = Entry::Final | Entry::Sealed;
+			// current->spec = Entry::Initonly;
 			bookKeeping();
 			ABSORB_UNTIL("\n;",FALSE, assignConstant);
   		      }
@@ -1174,7 +1189,8 @@ HEREDOC           <<-?['"]?({LETTER}|{DIGIT}|"_")+['"]?
 
 <FunctionDec>{
   ({CONSTNAME}|self)\.  { // this is a class function
-  			current->stat = TRUE;
+  			if(g_namespace_kind == "class")
+  			  current->stat = TRUE;
 			bookKeeping();
   		      }
 
@@ -1328,6 +1344,19 @@ HEREDOC           <<-?['"]?({LETTER}|{DIGIT}|"_")+['"]?
 		      }
 
 
+}
+
+<Regexp>{
+
+  "/"		      {
+			if(! context.pendingBackspace)
+  		          POP_SC;
+			bookKeeping();
+		      }
+
+  [^/]		      {
+			bookKeeping();
+		      }
 }
 
 
@@ -1550,7 +1579,7 @@ void RubyLanguageScanner::parseCode(CodeOutputInterface &codeOutIntf,
   /** 
       \todo Write a code scanner, when I know how to write one.
   */
-  printf("Should be parsing code: %s\n", (const char*) input);
+  // printf("Should be parsing code: %s\n", (const char*) input);
 }
 
 void RubyLanguageScanner::parsePrototype(const char *text)
