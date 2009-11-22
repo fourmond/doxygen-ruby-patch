@@ -57,7 +57,7 @@
 #include "defargs.h"
 #include "language.h"
 #include "commentscan.h"
-// #include "pycode.h"
+#include "rubycode.h"
 
 #define YY_NEVER_INTERACTIVE 1
 
@@ -1574,8 +1574,8 @@ void RubyLanguageScanner::parseCode(CodeOutputInterface &codeOutIntf,
     MemberDef *memberDef
     )
 {
-  // ::parsePythonCode(codeOutIntf,scopeName,input,isExampleBlock,exampleName,
-  //                   fileDef,startLine,endLine,inlineFragment,memberDef);
+  ::parseRubyCode(codeOutIntf,scopeName,input,isExampleBlock,exampleName,
+                  fileDef,startLine,endLine,inlineFragment,memberDef);
   /** 
       \todo Write a code scanner, when I know how to write one.
   */
@@ -1591,7 +1591,7 @@ void RubyLanguageScanner::parsePrototype(const char *text)
 void RubyLanguageScanner::resetCodeParserState()
 {
   
-  // ::resetRubyCodeParserState();
+  ::resetRubyCodeParserState();
   /** 
       \todo Write a code scanner, when I know how to write one.
   */

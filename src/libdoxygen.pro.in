@@ -87,6 +87,8 @@ HEADERS      =	bufstr.h \
                 printdocvisitor.h \
                 pycode.h \
                 pyscanner.h \
+                rubycode.h \
+                rubyscanner.h \
                 fortrancode.h \
                 fortranscanner.h \
                 dbusxmlscanner.h \
@@ -216,6 +218,7 @@ SOURCES      =	ce_lex.cpp \
 		pycode.cpp \
 		pyscanner.cpp \    
 		rubyscanner.cpp \    
+		rubycode.cpp \    
 		qhp.cpp \
 		qhpxmlwriter.cpp \
 		reflist.cpp \

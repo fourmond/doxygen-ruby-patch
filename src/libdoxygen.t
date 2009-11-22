@@ -60,6 +60,9 @@ sub GenerateDep {
 #$ GenerateDep("pycode.cpp","pycode.l");
 	$(LEX) -PpycodeYY -t pycode.l | $(INCBUFSIZE) >pycode.cpp
 
+#$ GenerateDep("rubycode.cpp","rubycode.l");
+	$(LEX) -PrubycodeYY -t rubycode.l | $(INCBUFSIZE) >rubycode.cpp
+
 #$ GenerateDep("fortranscanner.cpp","fortranscanner.l");
 	$(LEX) -i -PfscanYY -t fortranscanner.l | $(INCBUFSIZE) >fortranscanner.cpp
 
