@@ -460,6 +460,11 @@ static void doInclusion()
     
     for(int i = 0; i < constants.count(); i++) {
       cur += "<li>" + constants[i] + what + "</li>\n";
+      current->name = constants[i];
+      current->fileName = yyFileName; 
+     /// \todo this isn't the right thing
+      current->section = Entry::USINGDECL_SEC;
+      newEntry();
     }
     includedModulesStack.push(cur);
     g_absorbed_string.resize(0);
@@ -785,6 +790,7 @@ STARTDOCSYMS      ^{B}"#"#+
 STARTPOUND        ^{B}"#"/[^#\n]
 POUNDCOMMENT      {B}"#"[^#\n][^\n]* 
 YIELDSTATEMENT    yield{B}[^;\n]*
+REQUIRE           require{B}["'][^"'\n]+["']
 
      /* attribute specifiers */
 
@@ -929,6 +935,26 @@ HEREDOC           <<-?['"]?({LETTER}|{DIGIT}|"_")+['"]?
 			}
 			bookKeeping();
     		      }
+  {REQUIRE}           {
+   		        printf("Require: %s\n", yytext);
+  		        if(context.definitionOK) {
+   		          printf(" --> OK\n");
+			  current->fileName  = yyFileName;
+			  current->startLine = yyLineNr;
+			  current->bodyLine  = yyLineNr;
+			  /// \todo this isn't the right thing
+			  current->section = Entry::USINGDIR_SEC;
+			  QCString file = yytext;
+			  file.stripPrefix("require");
+			  file = file.stripWhiteSpace();
+			  current->name = file.mid(1,file.size() - 2);
+			  if(current->name.contains(".rb") < 0) {
+			    current->name += ".rb";
+			  }			  
+			  newEntry();
+			}
+			bookKeeping();
+  		      }
 
   "def"{BB}           { // start of a function/method definition
 	      	        if(context.definitionOK) {

@@ -3,6 +3,7 @@
  * 
  *
  * Copyright (C) 1997-2008 by Dimitri van Heesch.
+ *               2009 by Vincent Fourmond
  *
  * Permission to use, copy, modify, and distribute this software and its
  * documentation under the terms of the GNU General Public License is hereby 
@@ -22,8 +23,8 @@
  */
 
 
-#ifndef PYCODE_H
-#define PYCODE_H
+#ifndef RUBYCODE_H
+#define RUBYCODE_H
 
 #include "qtbc.h"
 #include <stdio.h>

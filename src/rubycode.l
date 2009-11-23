@@ -3,6 +3,7 @@
  * 
  *
  * Copyright (C) 1997-2008 by Dimitri van Heesch.
+ *               2009 by Vincent Fourmond
  *
  * Permission to use, copy, modify, and distribute this software and its
  * documentation under the terms of the GNU General Public License is hereby 
@@ -77,10 +78,37 @@ static bool          g_doubleQuote;
 static bool          g_noSuiteFound;
 static int           g_stringContext;
 
+/// The nested scopes around the thing
+static QValueStack<QCString>  nestedScopes;
+
 static QValueStack<uint> g_indents;  //!< Tracks indentation levels for scoping in python
 
 static void endFontClass();
 static void adjustScopesAndSuites(unsigned indentLength);
+
+static void enterScope(const char *sc)
+{
+  nestedScopes.push(sc);
+}
+
+static void leaveScope()
+{
+  nestedScopes.pop();
+}
+
+static NamespaceDef * findNameSpace(const char * name)
+{
+  QCString n = name;
+  NamespaceDef * d = 0;
+  for(int i = nestedScopes.count(); i >= 0; i--) {
+    d = getResolvedNamespace((const char*)n);
+    if(d)
+      break;
+    if(i)
+      n = nestedScopes[i - 1] + "::" + n;
+  }
+  return d;
+}
 
 
 /*! Represents a stack of variable to class mappings as found in the
@@ -579,7 +607,8 @@ static void generateClassOrGlobalLink(CodeOutputInterface &ol,char *clName,
   // Don't do anything for empty text
   if (className.isEmpty()) return;
 
-  ClassDef *cd=0,*lcd=0;  /** Class def that we may find */
+  Definition *cd=0; /// Class or namespace
+  ClassDef *lcd=0;  /** Class def that we may find */
   MemberDef *md=0;        /** Member def that we may find */
   bool isLocal=FALSE;
 
@@ -590,6 +619,8 @@ static void generateClassOrGlobalLink(CodeOutputInterface &ol,char *clName,
     Definition *d = g_currentDefinition;
 
     cd = getResolvedClass(d,g_sourceFileDef,className,&md);
+    if(! cd) /// \todo: enhance namespace detection.
+      cd = findNameSpace(className);
 
     //printf("d=%p g_sourceFileDef=%p\n",d,g_currentDefinition);
     //printf("is found as a type %s\n",cd?cd->name().data():"<null>");
@@ -926,11 +957,22 @@ ASSIGNMENT_STMT     ({TARGET_LIST}"=")+{EXPRESSION_LIST}
 TARGET_LIST             {TARGET}(","{TARGET})*","?
 TARGET           ({IDENTIFIER}|"("{TARGET_LIST}")"|"["{TARGET_LIST}"]"|{ATTRIBUTEREF}|{SUBSCRIPTION}|{SLICING})
 
+      /* limit of a word */
+WLIM   	  	  [^[:alnum:]!?_]
+CAPITAL           [A-Z]
+CONSTNAME         {CAPITAL}({LETTER}|{DIGIT}|"_")*
+FUNCNAME          {IDENTIFIER}([?!]|{B}=)?
+
 
 %option noyywrap
 %option nounput
-
+  
+  /** \todo copy from the scanner */
+  /* used for global or class-like scopes */
 %x Body
+
+%x Inner
+  /* used for */
 
 %x FunctionDec
 %x FunctionParams
@@ -952,116 +994,71 @@ TARGET           ({IDENTIFIER}|"("{TARGET_LIST}")"|"["{TARGET_LIST}"]"|{ATTRIBUT
 
 %%
 
-<Body,Suite>{
-      "def"{BB}                     {
-				        startFontClass("keyword");
-					codify(yytext);
-					endFontClass();
-					BEGIN( FunctionDec );
-		                    }
+<Body>{
+  "def"{BB}             {
+			  startFontClass("keyword");
+			  codify(yytext);
+			  endFontClass();
+			  BEGIN( FunctionDec );
+		        }
 
-      "class"{BB}                   {
-				        startFontClass("keyword");
-					codify(yytext);
-					endFontClass();
-					BEGIN( ClassDec );
-		                    }
-      "None"                        {
-				        startFontClass("keywordtype");
-					codify(yytext);
-					endFontClass();
-				    }
-      "self."{IDENTIFIER}           {
-				        codify("self.");
-				        findMemberLink(*g_code,&yytext[5]);
-	                            }
+  (class|module)/{WLIM} { // class definition
+			  startFontClass("keyword");
+			  codify(yytext);
+			  endFontClass();
+			  BEGIN( ClassDec );
+		        }
 }
 
-<ClassDec>{IDENTIFIER}              {
+<ClassDec>{
+  
+  {CONSTNAME}           {
+			  generateClassOrGlobalLink(*g_code,yytext);
+			  // codify(yytext);
+			  g_curClassName = yytext;
+                          enterScope(yytext);
+			  g_curClassBases.clear();
+			  BEGIN( ClassInheritance );
+		        }
 
-					generateClassOrGlobalLink(*g_code,yytext);
-					// codify(yytext);
-					g_curClassName = yytext;
-					g_curClassBases.clear();
-					BEGIN( ClassInheritance );
-		                    }
+  .                     {
+  			  codify(yytext);
+			}
+}
 
 <ClassInheritance>{
-   ({BB}|[(,)])                     {
-					codify(yytext);
-                                    }
+   {CONSTNAME}          {
+   		          g_curClassBases.inSort(yytext);
+			  generateClassOrGlobalLink(*g_code,yytext);
+		        }
+		      
+   [\n]	                {
+			  codifyLines(yytext);
+			  BEGIN(Body);
+		        }
 
-   {IDENTIFIER}                     {
-                                        // The parser
-					// is assuming
-					// that ALL identifiers
-					// in this state
-					// are base classes;
-					// it doesn't check to see
-					// that the first parenthesis
-					// has been seen.
+   [;]	                {
+			  codify(yytext);
+			  BEGIN(Body);
+		        }
 
-					// This is bad - it should
-					// probably be more strict
-					// about what to accept.
+   .	                {
+			  codify(yytext);
+			  BEGIN(Body);
+		        }
 
-                                        g_curClassBases.inSort(yytext);
-					generateClassOrGlobalLink(*g_code,yytext);
-					// codify(yytext);
-                                    }
-
-    ":"                             {
-				      codify(yytext);
-
-				      // Assume this will
-				      // be a one-line suite;
-				      // found counter-example
-				      // in SuiteStart.
-
-                                      // Push a class scope
-
-                                      ClassDef *classDefToAdd = new ClassDef("<code>",1,g_curClassName,ClassDef::Class,0,0,FALSE);
-                                      g_codeClassSDict.append(g_curClassName,classDefToAdd);
-                                      char *s=g_curClassBases.first();
-                                      while (s) 
-				      {
-                                        ClassDef *baseDefToAdd;
-                                        baseDefToAdd=g_codeClassSDict[s];
-
-					// Try to find class in global
-					// scope
-					if (baseDefToAdd==0) 
-					{
-					  baseDefToAdd=getResolvedClass(g_currentDefinition,g_sourceFileDef,s);
-					}
-
-					if (baseDefToAdd && baseDefToAdd!=classDefToAdd) 
-					{
-				          classDefToAdd->insertBaseClass(baseDefToAdd,s,Public,Normal);
-					}
-
-                                        s=g_curClassBases.next();
-			              }
-
-				      // Reset class-parsing variables.
-				      g_curClassName.resize(0);
-				      g_curClassBases.clear();
-				      
-				      g_noSuiteFound = TRUE;
-				      BEGIN( SuiteStart );
-                                    }
 }
 
 
 <FunctionDec>{
-    {IDENTIFIER}                    {
-                                        generateFunctionLink(*g_code,yytext);
-                                    }
+    {FUNCNAME}          {
+                          generateFunctionLink(*g_code,yytext);
+                        }
 
-    {B}"("                          {
-				        codify(yytext);
-					BEGIN( FunctionParams );
-		                    }
+    {B}"("              {
+		          codify(yytext);
+			  BEGIN( FunctionParams );
+		        }
 }
 
 <FunctionParams>{
