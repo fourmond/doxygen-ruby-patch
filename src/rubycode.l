@@ -78,6 +78,41 @@ static bool          g_doubleQuote;
 static bool          g_noSuiteFound;
 static int           g_stringContext;
 
+// Push/pop start conditions
+static QValueStack<int>     g_sc_stack;
+
+#define PUSH_SC(n) g_sc_stack.push(YY_START);BEGIN(n)
+#define POP_SC { if(g_sc_stack.count()) BEGIN(g_sc_stack.pop()); \
+	       	   else { BEGIN(Outer);}}
+
+static QCString         g_heredoc_marker;
+static bool 		g_pending_heredoc;
+static int 		hereDocContext;
+
+/// The context
+static RubyLanguageScanner::ScannerContext context;
+
+static void oneCharBookKeeping(char ch)
+{
+  context.parseOneChar(ch);
+  if(ch == '\n') {
+    if(g_pending_heredoc) {
+      PUSH_SC(hereDocContext);
+      g_pending_heredoc = FALSE;
+    }
+  }
+}
+
+// This function *must* be called at the end of every single rule !
+static void bookKeeping()
+{
+  // printf("Doing bookkeeping of '%s'\n", yytext);
+  for( const char* c = yytext ; *c ; ++c )
+    oneCharBookKeeping(*c);
+}
+
+
+
 /// The nested scopes around the thing
 static QValueStack<QCString>  nestedScopes;
 
@@ -833,6 +868,14 @@ static void endFontClass()
   }
 }
 
+/// A very handy shortcut...
+static void codify(const char* text, const char * fontclass) 
+{ 
+  startFontClass(fontclass);
+  g_code->codify(text);
+  endFontClass();
+}
+
 #undef YY_INPUT
 #define YY_INPUT(buf,result,max_size) result=yyread(buf,max_size);
 
@@ -878,8 +921,6 @@ SHORTSTRINGITEM   ({SHORTSTRINGCHAR}|{ESCAPESEQ})
 SHORTSTRINGCHAR   [^\\\n"]
 STRINGLITERAL     {STRINGPREFIX}?( {SHORTSTRING} | {LONGSTRING})  
 STRINGPREFIX      ("r"|"u"|"ur"|"R"|"U"|"UR"|"Ur"|"uR")
-KEYWORD ("lambda"|"import"|"class"|"assert"|"as"|"from"|"global"|"def"|"True"|"False")
-FLOWKW  ("or"|"and"|"is"|"not"|"print"|"for"|"in"|"if"|"try"|"except"|"yield"|"raise"|"break"|"continue"|"pass"|"if"|"return"|"while"|"elif"|"else"|"finally")
 QUOTES            ("\""[^"]*"\"")
 SINGLEQUOTES      ("'"[^']*"'")
 
@@ -963,16 +1004,32 @@ CAPITAL           [A-Z]
 CONSTNAME         {CAPITAL}({LETTER}|{DIGIT}|"_")*
 FUNCNAME          {IDENTIFIER}([?!]|{B}=)?
 
+      /* Expressions starting a block that must finish with and end */
+      /* the ones that must start with a statement */
+SBLOCK	     	  if|while|until|unless
+      /* the ones for which we don't care too much */
+EBLOCK	     	  begin|proc|do|for|def|case|module|class({B}<<)?
+
+      /* keywords...*/
+KEYWORDS          or|and|not|for|in|if|try|yield|raise|break|continue|return|while|elsif|else|rescue|throw|when
+
+      /* special values */
+
+SPECIAL		  true|false|nil|self
+HEREDOC           <<-?['"]?({LETTER}|{DIGIT}|"_")+['"]?
+
 
 %option noyywrap
 %option nounput
   
   /** \todo copy from the scanner */
-  /* used for global or class-like scopes */
-%x Body
 
+  /* used for global or class-like scopes */
+%x Outer
+
+  /* used for inner scopes (function definitions, loops...) */
 %x Inner
-  /* used for */
+
 
 %x FunctionDec
 %x FunctionParams
@@ -980,371 +1037,344 @@ FUNCNAME          {IDENTIFIER}([?!]|{B}=)?
 %x ClassDec
 %x ClassInheritance
 
-%x Suite
-%x SuiteCaptureIndent
-%x SuiteStart
-%x SuiteMaintain
-%x SuiteContinuing
-
-%x LongString
-
-%x SingleQuoteString
-%x DoubleQuoteString
-%x TripleString
+  /* string states */
+%x SingleQuotedString
+%x DoubleQuotedString
+%x HereDoc
+%x Regexp
 
 %%
 
-<Body>{
-  "def"{BB}             {
-			  startFontClass("keyword");
+<Outer,Inner>{
+  {HEREDOC} 	      {
+  		        if(1) { 
+			  hereDocContext = HereDoc;
+			  QCString str = yytext;
+			  str.stripPrefix("<<");
+			  str = str.stripWhiteSpace();
+			  str.stripPrefix("-");
+			  str.stripPrefix("'");
+			  str.stripPrefix("\"");
+			  if(str.contains('\'') || str.contains('"'))
+			    str = str.left(str.size() - 2);
+			  g_heredoc_marker = str.stripWhiteSpace();
+			  g_pending_heredoc = TRUE;
+			  // printf("Found pending here document: %s\n",
+			  // 	 (const char*) g_heredoc_marker);
+			}
+			codify(yytext, "stringliteral");
+			bookKeeping();
+			// it will only trigger at end of line...
+  		      }
+
+  "'"		      {
+  		        PUSH_SC(SingleQuotedString);
+			startFontClass("stringliteral");
+			codify(yytext);
+			bookKeeping();
+		      }
+
+  \" 		      {
+  		        PUSH_SC(DoubleQuotedString);
+			startFontClass("stringliteral");
+			codify(yytext);
+			bookKeeping();
+		      }
+
+  "/"		      {
+  		        if(context.surelyExpression) {
+  		          PUSH_SC(Regexp);
+			  codify(yytext, "stringliteral");
+			}
+			else
 			  codify(yytext);
-			  endFontClass();
-			  BEGIN( FunctionDec );
+			bookKeeping();
+		      }
+
+}
+
+
+<Outer>{
+  "def"{BB}             {
+  			  /// \todo add parsing for various things, such as
+			  /// attributes, constants, funcalls...
+  			  if(context.definitionOK) {
+			    codify(yytext, "keyword");
+			    BEGIN( FunctionDec );
+			  }
+			  else
+			    codify(yytext);
+			  bookKeeping();
 		        }
 
   (class|module)/{WLIM} { // class definition
-			  startFontClass("keyword");
-			  codify(yytext);
-			  endFontClass();
-			  BEGIN( ClassDec );
+  			  if(context.definitionOK) {
+			    codify(yytext, "keyword");
+			    BEGIN( ClassDec );
+			  }
+			  else
+			    codify(yytext);
+			  bookKeeping();
 		        }
+
 }
+
+
+  /* When in this state, we ignore everything until the matching end */
+<Inner>{
+  "end"/{WLIM}        {	
+  		        if(context.definitionOK) {
+			  POP_SC;
+			  codify(yytext, "keyword");
+			}
+			else
+			  codify(yytext);
+			bookKeeping();
+		      }
+
+}
+
+<Outer,Inner>{
+  {EBLOCK}/{WLIM}    {
+  			if(context.expressionOK) {
+			  PUSH_SC(Inner);
+			  codify(yytext, "keyword");
+                        }
+			else
+			  codify(yytext);
+			bookKeeping();
+		      }
+
+  {SBLOCK}/{WLIM}    {
+  			if(context.ifNewBlock) {
+			  PUSH_SC(Inner);
+			  codify(yytext, "keyword");
+                        }
+			else if(context.expressionOK) {
+			  codify(yytext, "keyword");
+                        }
+			else
+			  codify(yytext);
+			bookKeeping();
+		      }
+
+  {KEYWORDS}/{WLIM}   {
+  		        if(context.expressionOK)
+  		          codify(yytext, "keyword");
+			else
+			  codify(yytext);
+			bookKeeping();
+		      }
+
+  {SPECIAL}/{WLIM}   {
+  		        if(context.expressionOK)
+  		          codify(yytext, "keywordflow"); // looks pretty nice
+			else
+			  codify(yytext);
+			bookKeeping();
+		      }
+
+  {POUNDCOMMENT}      {
+			codify(yytext, "comment");
+			bookKeeping();
+                      }
+
+  {NEWLINE}           {
+  		        bookKeeping();
+  		        codifyLines(yytext);
+  		      }
+
+  .                   { 
+  		        // printf("Slurping: '%s'\n", yytext);
+			codify(yytext);
+  		        bookKeeping();
+                      }
+}
+
+
 
 <ClassDec>{
   
-  {CONSTNAME}           {
-			  generateClassOrGlobalLink(*g_code,yytext);
-			  // codify(yytext);
-			  g_curClassName = yytext;
-                          enterScope(yytext);
-			  g_curClassBases.clear();
-			  BEGIN( ClassInheritance );
-		        }
+  {CONSTNAME}         {
+			generateClassOrGlobalLink(*g_code,yytext);
+			// codify(yytext);
+			g_curClassName = yytext;
+                        enterScope(yytext);
+			g_curClassBases.clear();
+			BEGIN( ClassInheritance );
+ 			bookKeeping();
+		      }
 
-  .                     {
-  			  codify(yytext);
-			}
+  .                   {
+  		        codify(yytext);
+  		        bookKeeping();
+		      }
 }
 
 <ClassInheritance>{
-   {CONSTNAME}          {
-   		          g_curClassBases.inSort(yytext);
-			  generateClassOrGlobalLink(*g_code,yytext);
-		        }
+   {CONSTNAME}        {
+   		        g_curClassBases.inSort(yytext);
+			generateClassOrGlobalLink(*g_code,yytext);
+  		        bookKeeping();
+		      }
 		      
-   [\n]	                {
-			  codifyLines(yytext);
-			  BEGIN(Body);
-		        }
+   [\n;]              {
+  		        bookKeeping();
+			codifyLines(yytext);
+			BEGIN(Outer);
+		      }
 
-   [;]	                {
-			  codify(yytext);
-			  BEGIN(Body);
-		        }
-
-   .	                {
-			  codify(yytext);
-			  BEGIN(Body);
-		        }
+   .	              {
+		        codify(yytext);
+			BEGIN(Outer);
+  		        bookKeeping();
+		      }
 
 }
 
 
 <FunctionDec>{
-    {FUNCNAME}          {
-                          generateFunctionLink(*g_code,yytext);
-                        }
 
-    {B}"("              {
-		          codify(yytext);
-			  BEGIN( FunctionParams );
-		        }
+  {CONSTNAME}         {
+			generateClassOrGlobalLink(*g_code,yytext);
+			// codify(yytext);
+			g_curClassName = yytext;
+                        enterScope(yytext);
+			g_curClassBases.clear();
+			BEGIN( ClassInheritance );
+ 			bookKeeping();
+		      }
+
+  "self"	      {
+  		        codify(yytext, "keywordflow");
+			bookKeeping();
+  		      }
+
+   {FUNCNAME}         {
+                        generateFunctionLink(*g_code,yytext);
+  		        bookKeeping();
+                      }
+
+   {B}"("             {
+		        codify(yytext);
+		  	BEGIN( FunctionParams );
+  		        bookKeeping();
+		      }
+
+   [;\n]	      {
+  		        bookKeeping();
+   		        codifyLines(yytext);
+			BEGIN(Outer);
+			PUSH_SC(Inner);
+                      }
+
+   .                  {
+		        codify(yytext);
+  		        bookKeeping();
+		      }
+
+
 }
 
 <FunctionParams>{
-    ({BB}|",")                      {
-                                         // Parses delimiters
-				         codify(yytext);
-                                    }
+    ({BB}|",")        {
+                        // Parses delimiters
+			codify(yytext);
+  		        bookKeeping();
+                      }
 
     ({IDENTIFIER}|{PARAMNONEMPTY}+) {
-				         codify(yytext);
-                                    }
-
-    ")"                             {
-                                         codify(yytext);
-                                    }
-
-    ":"                             {
 				      codify(yytext);
-
-				      // Assume this will
-				      // be a one-line suite;
-				      // found counter-example
-				      // in SuiteStart.
-				      g_noSuiteFound = TRUE;
-				      BEGIN( SuiteStart );
+  		        	      bookKeeping();
                                     }
+
+    {NEWLINE}         {
+                        codifyLines(yytext);
+		      }
+
+    ")"               {
+                        codify(yytext);
+  		        bookKeeping();
+			BEGIN(Outer);
+			PUSH_SC(Inner);
+                      }
 }
 
-<Body,Suite>{
+<SingleQuotedString>{
 
-    {KEYWORD}                  {
-                                 // Position-sensitive rules!
-                                 // Must come AFTER keyword-triggered rules
-                                 // Must come BEFORE identifier NONEMPTY-like rules
-                                 //   to syntax highlight.
+  "'"		      {
+			codify(yytext);
+			if(! context.pendingBackspace) {
+  		          POP_SC;
+			  endFontClass();
+			}
+			bookKeeping();
+		      }
 
-  		                 startFontClass("keyword");
-  		                 codify(yytext);
-		                 endFontClass();
-                               }
+  [^']	       	      {
+			bookKeeping();
+			codifyLines(yytext);
+		      }
 
-    {FLOWKW}                   {
-  		                 startFontClass("keywordflow");
-  		                 codify(yytext);
-		                 endFontClass();
-                               }
 
-    {IDENTIFIER}               {
-  		                 codify(yytext);
-			       }
 }
 
+<Regexp>{
 
+  "/"		      {
+			codify(yytext);
+			if(! context.pendingBackspace) {
+  		          POP_SC;
+			  endFontClass();
+			}
+			bookKeeping();
+		      }
 
-<SuiteStart>{
-
-    {BB}                               {
-                                         codify(yytext);
-                                       }
-    {KEYWORD}                          {
-                                          startFontClass("keyword");
-					  codifyLines(yytext);
-		                          endFontClass();
-
-					  // No indentation necesary
-					  g_noSuiteFound = FALSE;
-                                       }
-
-    {FLOWKW}                           {
-                                          startFontClass("keywordflow");
-					  codifyLines(yytext);
-		                          endFontClass();
-
-					  // No indentation necesary
-					  g_noSuiteFound = FALSE;
-                                       }
-    {IDENTIFIER}                       {
-                                         codify(yytext);
-				       } 
-
-
-    {POUNDCOMMENT}                     {
-                                          // This eats EVERYTHING
-					  // except the newline
-                                          startFontClass("comment");
-					  codifyLines(yytext);
-		                          endFontClass();
-                                       }
-
-    {NEWLINE}                          {
-					  codifyLines(yytext);
-					  if ( g_noSuiteFound ) 
-					  {
-                                            // printf("New suite to capture! [%d]\n", g_yyLineNr);
-					    BEGIN ( SuiteCaptureIndent );
-					  }
-                                       }
-}
-
-<SuiteCaptureIndent>{
-    "\n"|({BB}"\n")            {
-                                 // Blankline - ignore, keep looking for indentation.
-				 codifyLines(yytext);
-                               }
-
-    {BB}                       {
-                                 // This state lasts momentarily,
-                                 // to check the indentation
-                                 // level that is about to be
-                                 // used.
-				 codifyLines(yytext);
-				 g_indents.push(yyleng);
-                                 // printf("Captured indent of %d [line %d]\n", yyleng, g_yyLineNr);
-				 BEGIN( Suite );
-                               }
-}
-
-<SuiteMaintain>{
-
-    {BB}/({NONEMPTY}|{EXPCHAR}) {
-                                 // This implements poor
-				 // indendation-tracking;
-                                 // should be improved.
-				 // (translate tabs to space, etc)
-  		                 codifyLines(yytext);
-                                 adjustScopesAndSuites(yyleng);
-                               }
-
-    "\n"|({BB}"\n")            {
-                                 // If this ever succeeds,
-				 // it means that this is
-				 // a blank line, and
-				 // can be ignored.
-  		                 codifyLines(yytext);
-                               }
-
-    ""/({NONEMPTY}|{EXPCHAR})  {
-                                 // Default rule; matches
-				 // the empty string, assuming
-				 // real text starts here.
-				 // Just go straight to Body.
-                                 adjustScopesAndSuites(0);
-                               }
+  [^/]		      {
+			bookKeeping();
+			codifyLines(yytext);
+		      }
 }
 
 
-<Suite>{NEWLINE}               {
-                                 codifyLines(yytext);
-			         BEGIN( SuiteMaintain );
-		               }
-<Body>{IDENTIFIER}	       {
-  			         codify(yytext);
-                               }
-<Body>{NEWLINE}                {
-  		                 codifyLines(yytext);
-                               }
+  /* Todo: this should be handling as well the #{ ... } 
+     substitution that can contain arbitraty code, such as
+     "end", for instance.
+  */
 
-<SingleQuoteString>{ // Single quoted string like 'That\'s a """nice""" string!'
-    \\{B}\n                    { // line continuation
-  		                 codifyLines(yytext);
-                               }
-    \\.			       { // espaced char
-  		                 codify(yytext);
-                               }
-    {STRINGPREFIX}?{TRIDOUBLEQUOTE} { // tripple double quotes
-  		                 codify(yytext);
-      			       }
-    "'"			       { // end of the string
-  		                 codify(yytext);
-				 endFontClass();
-      		                 BEGIN(g_stringContext);
-                               }
-    [^"'\n\\]+	               { // normal chars
-  		                 codify(yytext);
-                               }
-    .			       { // normal char
-  		                 codify(yytext);
-                               }
+<DoubleQuotedString>{
+
+  \"		      {
+			codify(yytext);
+			if(! context.pendingBackspace) {
+  		          POP_SC;
+			  endFontClass();
+			}
+			bookKeeping();
+  		      }
+
+  [^"]		      {
+			bookKeeping();
+			codifyLines(yytext);
+		      }
+
+}
+<HereDoc>{
+  .* 	              {
+ 		        QCString line = QCString(yytext).stripWhiteSpace();
+ 			if(g_heredoc_marker == line) {
+			  POP_SC;
+			  endFontClass();
+                        }
+			codify(yytext);
+ 			bookKeeping();
+ 		      }
+  {NEWLINE}           { // so that newlines are not taken into account.
+ 			bookKeeping();
+			codifyLines(yytext);
+		      }
 }
 
-<DoubleQuoteString>{ // Double quoted string like "That's \"a '''nice'''\" string!"
-    \\{B}\n                    { // line continuation
-  		                 codifyLines(yytext);
-                               }
-    \\.			       { // espaced char
-  		                 codify(yytext);
-                               }
-    {STRINGPREFIX}?{TRISINGLEQUOTE} { // tripple single quotes
-  		                 codify(yytext);
-      			       }
-    "\""		       { // end of the string
-  		                 codify(yytext);
-				 endFontClass();
-      		                 BEGIN(g_stringContext);
-                               }
-    [^"'\n\\]+	               { // normal chars
-  		                 codify(yytext);
-                               }
-    .			       { // normal char
-  		                 codify(yytext);
-                               }
-}
-
-<TripleString>{
-    {TRIDOUBLEQUOTE}   | 
-    {TRISINGLEQUOTE}   {
-  		          codify(yytext);
-			  if (g_doubleQuote==(yytext[0]=='"')) 
-			  {
-			    endFontClass();
-			    BEGIN(g_stringContext);
-			  }
-		       }
-    {LONGSTRINGBLOCK}  {
-			 codifyLines(yytext);
-		       }
-    \n		       {
-			 codifyLines(yytext);
-                       }
-    .		       {
-                         codify(yytext);
-                       }
-}
-
-  /*
-<*>({NONEMPTY}|{EXPCHAR}|{BB})           { // This should go one character at a time.
-  		                 codify(yytext);
-				 // printf("[rubycode] '%s' [ state %d ]  [line %d] no match\n",
-				 //       yytext, YY_START, g_yyLineNr);
-
-				 //endFontClass();
-				 BEGIN(Body);					
-                               }
-   */
-
-<*>{STRINGPREFIX}?{TRISINGLEQUOTE} |
-<*>{STRINGPREFIX}?{TRIDOUBLEQUOTE} {
-  				 startFontClass("stringliteral");
-				 g_stringContext=YY_START;
-				 g_doubleQuote=yytext[yyleng-1]=='"';
-  		                 codify(yytext);
-				 BEGIN(TripleString);
-                               }
-<*>{STRINGPREFIX}?"'"	       { // single quoted string
-  				 startFontClass("stringliteral");
-				 g_stringContext=YY_START;
-  		                 codify(yytext);
-				 BEGIN(SingleQuoteString);
-  			       }
-<*>{STRINGPREFIX}?"\""         { // double quoted string
-  				 startFontClass("stringliteral");
-				 g_stringContext=YY_START;
-  		                 codify(yytext);
-				 BEGIN(DoubleQuoteString);
-                               }
-<*>{POUNDCOMMENT}              {
-  				 if (YY_START==SingleQuoteString || 
-				     YY_START==DoubleQuoteString || 
-				     YY_START==TripleString
-				    )
-				 {
-				   REJECT;
-				 }
-                                 // This eats EVERYTHING
-				 // except the newline
-                                 startFontClass("comment");
-				 codifyLines(yytext);
-		                 endFontClass();
-                               }
-<*>{NEWLINE}                   {
-  		                 codifyLines(yytext);
-				 //printf("[rubycode] %d NEWLINE [line %d] no match\n",
-				 //       YY_START, g_yyLineNr);
-
-				 //endFontClass();
-				 BEGIN(Body);
-                               }
-
-<*>.                           {
-  		                 codify(yytext);
-				 // printf("[rubycode] '%s' [ state %d ]  [line %d] no match\n",
-				 //        yytext, YY_START, g_yyLineNr);
-
-				 //endFontClass();
-				 BEGIN(Body);					
-                               }
 
 %%
 
@@ -1358,38 +1388,7 @@ void resetRubyCodeParserState()
   g_doubleStringIsDoc = FALSE;
   g_paramParens = 0;
   g_indents.clear();
-  BEGIN( Body );
-}
-
-/*!
-  Examines current stack of white-space indentations;
-  re-syncs the parser with the correct scope.
-*/
-static void adjustScopesAndSuites(unsigned indentLength) 
-{
-  // States to pop
-  if (!g_indents.isEmpty() && indentLength < g_indents.top()) 
-  {
-    while (!g_indents.isEmpty() && indentLength < g_indents.top()) 
-    {
-      // printf("Exited scope indent of [%d]\n", g_indents.top());
-      g_indents.pop(); // Pop the old suite's indentation
-
-      g_currentMemberDef=0;
-      if (g_currentDefinition) 
-	g_currentDefinition=g_currentDefinition->getOuterScope();
-    }
-  }
-
-  // Are there any remaining indentation levels for suites?
-  if (!g_indents.isEmpty()) 
-  {
-    BEGIN( Suite );
-  }
-  else 
-  {
-    BEGIN( Body );
-  }
+  BEGIN( Outer );
 }
 
 void parseRubyCode(CodeOutputInterface &od,const char *className,
@@ -1412,6 +1411,9 @@ void parseRubyCode(CodeOutputInterface &od,const char *className,
   g_inputPosition = 0;
   g_currentFontClass = 0;
   g_needsTermination = FALSE;
+
+  // needs to be initialize here
+  hereDocContext = HereDoc;
   if (endLine!=-1)
     g_inputLines  = endLine+1;
   else
@@ -1430,6 +1432,7 @@ void parseRubyCode(CodeOutputInterface &od,const char *className,
   // Starts line 1 on the output  
   startCodeLine();
 
+  context.reset();
   rubycodeYYrestart( rubycodeYYin );
 
   rubycodeYYlex();

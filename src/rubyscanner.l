@@ -128,7 +128,7 @@ static bool 		g_pending_heredoc;
 static int 		hereDocContext;
 
 // Push_pop start conditions
-QValueStack<int>        g_sc_stack;
+static QValueStack<int> g_sc_stack;
 
 #define PUSH_SC(n) g_sc_stack.push(YY_START);BEGIN(n)
 #define POP_SC { if(g_sc_stack.count()) BEGIN(g_sc_stack.pop()); \
