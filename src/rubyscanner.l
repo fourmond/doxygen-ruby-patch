@@ -77,7 +77,6 @@ static Protection	protection;
 static Entry*		current_root = 0 ;
 static Entry*		current      = 0 ;
 static Entry*		previous     = 0 ;
-static Entry*		bodyEntry    = 0 ;
 static Entry*		global_root  = 0 ;
 
 static int		yyLineNr     = 1 ;
@@ -97,24 +96,15 @@ static QCString         docBlockName;
 static bool             docBlockInBody;
 static bool             docBlockJavaStyle;
 static bool             docBrief;
-static bool             docBlockSpecial;
 
-static bool             g_doubleQuote;
 static bool             g_specialBlock;
-static int              g_stringContext;
-static QGString *       g_copyString;
-static int              g_indent = 0;
-static int              g_curIndent = 0;
 
 static QDict<QCString>  g_packageNameCache(257);
 static QCString         g_packageScope;
 
 static QCString         g_packageName;
 
-static bool             g_hideClassDocs;
-
 static QCString         g_defVal;
-static int              g_braceCount;
 
 static bool             g_lexInit = FALSE;
 static bool             g_packageCommentAllowed;
@@ -274,7 +264,7 @@ static Entry * lookupFunction(QCString name)
   if(! current_root)
     return 0;
   QList<Entry> * c = const_cast<QList<Entry> * >(current_root->children());
-  for(int i = 0; i < c->count(); i++)
+  for(unsigned i = 0; i < c->count(); i++)
     if(c->at(i)->name == name)
       return c->at(i);
 
@@ -397,7 +387,7 @@ static void doAttributes()
       
     QValueList<QCString> symbols = 
       parseSymbols(g_absorbed_string);
-    for(int i = 0; i < symbols.count(); i++) {
+    for(unsigned i = 0; i < symbols.count(); i++) {
       current->name = symbols[i];
       current->protection = Public;
       current->fileName  = yyFileName;
@@ -421,7 +411,7 @@ static void doProtection()
   // printf("Symbols count: %d\n", symbols.count());
   if(symbols.count() > 0) {
     // We do not touch global protection
-    for(int i = 0; i < symbols.count(); i++) {
+    for(unsigned i = 0; i < symbols.count(); i++) {
       Entry * func = lookupFunction(symbols[i]);
       if(func)
 	func->protection = g_pending_protection;
@@ -458,7 +448,7 @@ static void doInclusion()
     else
       cur = includedModulesStack.pop();
     
-    for(int i = 0; i < constants.count(); i++) {
+    for(unsigned i = 0; i < constants.count(); i++) {
       cur += "<li>" + constants[i] + what + "</li>\n";
       current->name = constants[i];
       current->fileName = yyFileName; 
@@ -521,7 +511,7 @@ static void enterNamespace(QCString name, QCString type)
   // 	 (const char*) yyFileName, yyLineNr);
 
   /// We first look for a namespace of the like in current_root
-  for(int i = 0; i < current_root->children()->count(); i++) {
+  for(unsigned i = 0; i < current_root->children()->count(); i++) {
     Entry * entry = const_cast<QList<Entry> *>(current_root->children())->at(i);
     if(entry->section & Entry::SCOPE_MASK)
       if((!entry->name.isEmpty()) && entry->name == (baseName + name)) {
@@ -599,39 +589,6 @@ static void leaveNamespace()
   }
 }
 
-
-static QCString findPackageScopeFromPath(const QCString &path)
-{
-  QCString *pScope = g_packageNameCache.find(path);
-  if (pScope)
-  {
-    return *pScope;
-  }
-  QFileInfo pf(path+"/__init__.py"); // found package initialization file
-  if (pf.exists())
-  {
-    int i=path.findRev('/');
-    if (i!=-1)
-    {
-      QCString scope = findPackageScopeFromPath(path.left(i));
-      if (!scope.isEmpty())
-      {
-	scope+="::";
-      }
-      scope+=path.mid(i+1);
-      g_packageNameCache.insert(path,new QCString(scope));
-      return scope;
-    }
-  }
-  return "";
-}
-  
-static QCString findPackageScope(const char *fileName)
-{
-  if (fileName==0) return "";
-  QFileInfo fi(fileName);
-  return findPackageScopeFromPath(fi.dirPath(TRUE).data());
-}
 
 //-----------------------------------------------------------------
 static void startCommentBlock(bool brief)
@@ -1632,7 +1589,7 @@ void dumpEntry(Entry *entry, int indentation)
 	  entry->section,
   	  (const char*)entry->fileName,
 	  entry->children()->count());
-  for(int i = 0; i < entry->children()->count(); i++)
+  for(unsigned i = 0; i < entry->children()->count(); i++)
     dumpEntry(const_cast<QList<Entry> *>(entry->children())->at(i), indentation+2);
 }
 
