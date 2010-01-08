@@ -467,8 +467,8 @@ static void doAlias()
   QValueList<QCString> symbols = 
     parseSymbols(g_absorbed_string);
   if(symbols.count() == 2) {
-    printf("Alias %s for %s\n", (const char*)symbols[0],
-    	   (const char*)symbols[1]);
+    // printf("Alias %s for %s\n", (const char*)symbols[0],
+    //	   (const char*)symbols[1]);
     handleCommentBlock(QCString("Alias for #") + symbols[1],FALSE);
     current->fileName  = yyFileName;
     current->startLine = yyLineNr;
@@ -761,6 +761,7 @@ HEREDOC           <<-?['"]?({LETTER}|{DIGIT}|"_")+['"]?
 /* emacs, please stop parsing */
 
 %option noyywrap
+%option nounput
 
   /* Main search state: current_root must be a namespace then */
 
@@ -893,9 +894,9 @@ HEREDOC           <<-?['"]?({LETTER}|{DIGIT}|"_")+['"]?
 			bookKeeping();
     		      }
   {REQUIRE}           {
-   		        printf("Require: %s\n", yytext);
+   		        // printf("Require: %s\n", yytext);
   		        if(context.definitionOK) {
-   		          printf(" --> OK\n");
+   		          // printf(" --> OK\n");
 			  current->fileName  = yyFileName;
 			  current->startLine = yyLineNr;
 			  current->bodyLine  = yyLineNr;

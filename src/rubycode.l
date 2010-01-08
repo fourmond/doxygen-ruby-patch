@@ -74,9 +74,6 @@ static QCString      g_type;
 static QCString      g_name;
 
 static bool          g_doubleStringIsDoc;
-static bool          g_doubleQuote;
-static bool          g_noSuiteFound;
-static int           g_stringContext;
 
 // Push/pop start conditions
 static QValueStack<int>     g_sc_stack;
@@ -119,7 +116,7 @@ static QValueStack<QCString>  nestedScopes;
 static QValueStack<uint> g_indents;  //!< Tracks indentation levels for scoping in python
 
 static void endFontClass();
-static void adjustScopesAndSuites(unsigned indentLength);
+// static void adjustScopesAndSuites(unsigned indentLength);
 
 static void enterScope(const char *sc)
 {
@@ -393,7 +390,6 @@ static ClassDef *stripClassName(const char *s)
 
   return 0;
 }
-
 
 
 /*! start a new line of code, inserting a line number if g_sourceFileDef
@@ -1022,7 +1018,11 @@ HEREDOC           <<-?['"]?({LETTER}|{DIGIT}|"_")+['"]?
 %option noyywrap
 %option nounput
   
-  /** \todo copy from the scanner */
+  /** \todo copy from the scanner -> ?*/
+
+  /** \todo Various things:
+    * the most important is probably the constants definition
+  */
 
   /* used for global or class-like scopes */
 %x Outer
