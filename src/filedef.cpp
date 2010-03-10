@@ -2,7 +2,7 @@
  *
  * 
  *
- * Copyright (C) 1997-2008 by Dimitri van Heesch.
+ * Copyright (C) 1997-2010 by Dimitri van Heesch.
  *
  * Permission to use, copy, modify, and distribute this software and its
  * documentation under the terms of the GNU General Public License is hereby 
@@ -93,6 +93,7 @@ FileDef::FileDef(const char *p,const char *nm,
     docname.prepend(stripFromPath(path.copy()));
   }
   m_isJava          = name().right(5)==".java";
+  m_isCSharp        = name().right(5)==".cs";
   memberGroupSDict = 0;
   acquireFileVersion();
   m_subGrouping=Config_getBool("SUBGROUPING");
@@ -1549,4 +1550,24 @@ bool FileDef::isLinkableInProject() const
   static bool showFiles = Config_getBool("SHOW_FILES");
   return hasDocumentation() && !isReference() && showFiles;
 }
+
+bool FileDef::includes(FileDef *incFile,QDict<FileDef> *includedFiles) const
+{
+  if (incFile==this) return TRUE;
+  //printf("%s::includes(%s)\n",name().data(),incFile->name().data());
+  includedFiles->insert(absFilePath(),this);
+  if (includeList)
+  {
+    QListIterator<IncludeInfo> ili(*includeList);
+    IncludeInfo *ii;
+    for (;(ii=ili.current());++ili)
+    {
+      if (ii->fileDef && 
+          includedFiles->find(ii->fileDef->absFilePath())==0 &&
+          ii->fileDef->includes(incFile,includedFiles)) return TRUE;
+    }
+  }
+  return FALSE;
+}
+
 

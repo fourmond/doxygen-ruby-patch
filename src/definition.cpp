@@ -2,7 +2,7 @@
  *
  * 
  *
- * Copyright (C) 1997-2008 by Dimitri van Heesch.
+ * Copyright (C) 1997-2010 by Dimitri van Heesch.
  *
  * Permission to use, copy, modify, and distribute this software and its
  * documentation under the terms of the GNU General Public License is hereby 
@@ -245,9 +245,7 @@ void Definition::addToMap(const char *name,Definition *d)
 
 void Definition::removeFromMap(Definition *d)
 {
-  QCString symbolName = d->symbolName();
-  int index=computeQualifiedIndex(symbolName);
-  if (index!=-1) symbolName=symbolName.mid(index+2);
+  QString symbolName = d->m_symbolName;
   if (!symbolName.isEmpty()) 
   {
     //printf("******* removing symbol `%s' (%p)\n",symbolName.data(),d);
@@ -451,7 +449,7 @@ void Definition::_setBriefDescription(const char *b,const char *briefFile,int br
   {
     switch(brief.at(bl-1))
     {
-      case '.': case '!': case '?': break;
+      case '.': case '!': case '?': case '>': case ':': break;
       default: 
         if (uni_isupper(brief.at(0))) brief+='.'; 
         break;
@@ -1148,6 +1146,7 @@ void Definition::makePartOfGroup(GroupDef *gd)
 
 void Definition::setRefItems(const QList<ListItemInfo> *sli)
 {
+  //printf("%s::setRefItems()\n",name().data());
   if (sli)
   {
     makeResident();
@@ -1168,6 +1167,7 @@ void Definition::setRefItems(const QList<ListItemInfo> *sli)
 
 void Definition::mergeRefItems(Definition *d)
 {
+  //printf("%s::mergeRefItems()\n",name().data());
   LockingPtr< QList<ListItemInfo> > xrefList = d->xrefListItems();
   if (xrefList!=0)
   {

@@ -2,7 +2,7 @@
  *
  * 
  *
- * Copyright (C) 1997-2008 by Dimitri van Heesch.
+ * Copyright (C) 1997-2010 by Dimitri van Heesch.
  *
  * Permission to use, copy, modify, and distribute this software and its
  * documentation under the terms of the GNU General Public License is hereby 
@@ -2687,12 +2687,12 @@ void MemberDef::addListReference(Definition *)
     }
     else if (optimizeOutputJava)
     {
-      if (!hideScopeNames) memName.prepend(pd->name()+".");
+      if (!hideScopeNames && pd!=Doxygen::globalScope) memName.prepend(pd->name()+".");
       memArgs = argsString();
     }
     else
     {
-      if (!hideScopeNames) memName.prepend(pd->name()+"::");
+      if (!hideScopeNames && pd!=Doxygen::globalScope) memName.prepend(pd->name()+"::");
       memArgs = argsString();
     }
   }
@@ -2700,7 +2700,7 @@ void MemberDef::addListReference(Definition *)
   if (xrefItems!=0)
   {
     addRefItem(xrefItems.pointer(),
-        qualifiedName(),
+        qualifiedName()+argsString(), // argsString is needed for overloaded functions (see bug 609624)
         memLabel,
         getOutputFileBase()+"#"+anchor(),memName,memArgs);
   }

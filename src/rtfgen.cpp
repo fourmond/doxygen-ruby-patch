@@ -2,7 +2,7 @@
  *
  * 
  *
- * Copyright (C) 1997-2008 by Parker Waechter & Dimitri van Heesch.
+ * Copyright (C) 1997-2010 by Parker Waechter & Dimitri van Heesch.
  *
  * Style sheet additions by Alexander Bartolich
  *
@@ -633,11 +633,11 @@ void RTFGenerator::endIndexSection(IndexSections is)
       t << "\\par " << rtf_Style_Reset << endl;
       if (fortranOpt)
       {
-          t << "{\\tc \\v " << theTranslator->trModulesIndex() << "}"<< endl;
+          t << "{\\tc \\v " << theTranslator->trModulesIndex() << "}" << endl;
       }
       else
       {
-          t << "{\\tc \\v " << theTranslator->trNamespaceIndex() << "}"<< endl;
+          t << "{\\tc \\v " << theTranslator->trNamespaceIndex() << "}" << endl;
       }
       
       t << "{\\field\\fldedit{\\*\\fldinst INCLUDETEXT \"namespaces.rtf\" \\\\*MERGEFORMAT}{\\fldrslt includedstuff}}\n";
@@ -2710,6 +2710,15 @@ void RTFGenerator::endConstraintList()
   t << "}";
 }
 
+void RTFGenerator::startIndexListItem()
+{
+  DBG_RTF(t << "{\\comment (startIndexListItem)}"    << endl)
+}
 
+void RTFGenerator::endIndexListItem()
+{
+  DBG_RTF(t << "{\\comment (endIndexListItem)}"    << endl)
+  t << "\\par" << endl;
+}
 
 

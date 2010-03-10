@@ -2,7 +2,7 @@
  *
  * 
  *
- * Copyright (C) 1997-2008 by Dimitri van Heesch.
+ * Copyright (C) 1997-2010 by Dimitri van Heesch.
  *
  * Permission to use, copy, modify, and distribute this software and its
  * documentation under the terms of the GNU General Public License is hereby 
@@ -511,10 +511,12 @@ void MemberList::addListReferences(Definition *def)
       LockingPtr<MemberList> enumFields = md->enumFieldList();
       if (md->memberType()==MemberDef::Enumeration && enumFields!=0)
       {
+        //printf("  Adding enum values!\n");
         MemberListIterator vmli(*enumFields);
         MemberDef *vmd;
         for ( ; (vmd=vmli.current()) ; ++vmli)
         {
+          //printf("   adding %s\n",vmd->name().data());  
           vmd->addListReference(def);
         }
       }

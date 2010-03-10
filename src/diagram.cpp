@@ -3,7 +3,7 @@
  * 
  *
  *
- * Copyright (C) 1997-2008 by Dimitri van Heesch.
+ * Copyright (C) 1997-2010 by Dimitri van Heesch.
  *
  * Permission to use, copy, modify, and distribute this software and its
  * documentation under the terms of the GNU General Public License is hereby 
@@ -999,7 +999,7 @@ void ClassDiagram::writeFigure(QTextStream &output,const char *path,
   }
 
   //output << "}\n";
-  output << ":\\begin{figure}[H]\n"
+  output << "\\begin{figure}[H]\n"
             "\\begin{center}\n"
             "\\leavevmode\n";
   output << "\\includegraphics[height=" << realHeight << "cm]{" 

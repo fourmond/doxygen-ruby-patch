@@ -2,7 +2,7 @@
  *
  * 
  *
- * Copyright (C) 1997-2008 by Dimitri van Heesch.
+ * Copyright (C) 1997-2010 by Dimitri van Heesch.
  *
  * Permission to use, copy, modify, and distribute this software and its
  * documentation under the terms of the GNU General Public License is hereby 
@@ -264,7 +264,7 @@ class VhdlDocGen
     static bool membersHaveSpecificType(MemberList *ml,int type);
     static void startFonts(const QCString& q, const char *keyword,OutputList& ol);
     static bool isNumber(const QCString& s);
-
+    static QCString getProtectionName(int prot);
   private:
     static void getFuncParams(QList<Argument>&, const char* str);
     static bool compareArgList(ArgumentList*,ArgumentList*);

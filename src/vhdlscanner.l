@@ -1,6 +1,6 @@
 /******************************************************************************
  *
- * Copyright (C) 1997-2008 by Dimitri van Heesch.
+ * Copyright (C) 1997-2010 by Dimitri van Heesch.
  *
  * Permission to use, copy, modify, and distribute this software and its
  * documentation under the terms of the GNU General Public License is hereby 
@@ -875,6 +875,11 @@ ENDPROTECEDBODY         "end"{BR}+"protected"{BR}+"body"{BR}+{NAME}
   current->name=QCString(qsl[0]);
   if (lastCompound)
   {
+    if (!VhdlDocGen::foundInsertedComponent(current->type,lastCompound))
+    {   
+      BaseInfo *bb=new BaseInfo(current->type,Public,Normal);
+      lastCompound->extends->append(bb);
+    }
     lastCompound->addSubEntry(current);
     current = new Entry;
     initEntry(current);
@@ -968,15 +973,15 @@ ENDPROTECEDBODY         "end"{BR}+"protected"{BR}+"body"{BR}+{NAME}
     //current->name+=qcs.lower();
     current->name.prepend(qcs+"::");
 
-    if (lastEntity)
-    {
+    //if (lastEntity)
+    //{
       // inherit private inheritance relation between entity and architecture
-      if (!VhdlDocGen::foundInsertedComponent(current->name,lastEntity))
-      {
-	BaseInfo *bb=new BaseInfo(current->name,Private,Normal);
-	lastEntity->extends->append(bb);    
-      }
-    }
+      //if (!VhdlDocGen::foundInsertedComponent(current->name,lastEntity))
+      //{
+	//	BaseInfo *bb=new BaseInfo(current->name,Private,Normal);
+	//	lastEntity->extends->append(bb);    
+      //}
+    //}
 
   }
   else if (current->spec==VhdlDocGen::PACKAGE_BODY)

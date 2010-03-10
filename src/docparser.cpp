@@ -3,7 +3,7 @@
  * 
  *
  *
- * Copyright (C) 1997-2008 by Dimitri van Heesch.
+ * Copyright (C) 1997-2010 by Dimitri van Heesch.
  *
  * Permission to use, copy, modify, and distribute this software and its
  * documentation under the terms of the GNU General Public License is hereby 
@@ -1888,7 +1888,7 @@ bool DocXRefItem::parse()
       }
       else
       {
-        m_file   = refList->listName();
+        m_file   = convertNameToFile(refList->listName());
         m_anchor = item->listAnchor;
       }
       m_title  = refList->sectionTitle();
@@ -4929,8 +4929,11 @@ int DocPara::handleHtmlStartTag(const QString &tagName,const HtmlAttribList &tag
   DBG(("handleHtmlStartTag(%s,%d)\n",tagName.data(),tagHtmlAttribs.count()));
   int retval=RetVal_OK;
   int tagId = Mappers::htmlTagMapper->map(tagName);
-  if (g_token->emptyTag && !(tagId&XML_CmdMask) && tagId!=HTML_UNKNOWN)
+  if (g_token->emptyTag && !(tagId&XML_CmdMask) && 
+      tagId!=HTML_UNKNOWN && tagId!=HTML_IMG && tagId!=HTML_BR)
+  {
       warn_doc_error(g_fileName,doctokenizerYYlineno,"Warning: HTML tags may not use the 'empty tag' XHTML syntax.");
+  }
   switch (tagId)
   {
     case HTML_UL: 

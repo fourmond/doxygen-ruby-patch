@@ -2,7 +2,7 @@
  *
  * 
  *
- * Copyright (C) 1997-2008 by Dimitri van Heesch.
+ * Copyright (C) 1997-2010 by Dimitri van Heesch.
  *
  * Permission to use, copy, modify, and distribute this software and its
  * documentation under the terms of the GNU General Public License is hereby 
@@ -125,6 +125,7 @@ class FileDef : public Definition
     bool isIncluded(const QCString &name) const;
 
     bool isJava() const { return m_isJava; }
+    bool isCSharp() const { return m_isCSharp; }
 
     void writeDocumentation(OutputList &ol);
     void writeMemberPages(OutputList &ol);
@@ -164,6 +165,7 @@ class FileDef : public Definition
 
     void addListReferences();
     bool isDocumentationFile() const;
+    bool includes(FileDef *incFile,QDict<FileDef> *includedFiles) const;
 
     MemberList *getMemberList(MemberList::ListType lt) const;
     const QList<MemberList> &getMemberLists() const { return m_memberLists; }
@@ -216,6 +218,7 @@ class FileDef : public Definition
     QIntDict<MemberDef>  *srcMemberDict;
     bool                  isSource;
     bool                  m_isJava;
+    bool                  m_isCSharp;
     QCString              fileVersion;
     PackageDef           *package;
     DirDef               *dir;

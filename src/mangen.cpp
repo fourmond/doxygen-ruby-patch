@@ -2,7 +2,7 @@
  *
  * 
  *
- * Copyright (C) 1997-2008 by Dimitri van Heesch.
+ * Copyright (C) 1997-2010 by Dimitri van Heesch.
  *
  * Permission to use, copy, modify, and distribute this software and its
  * documentation under the terms of the GNU General Public License is hereby 
@@ -100,6 +100,7 @@ void ManGenerator::init()
 static QCString buildFileName(const char *name)
 {
   QCString fileName;
+  if (name==0) return "noname";
 
   const char *p=name;
   char c;
@@ -407,7 +408,7 @@ void ManGenerator::startDoxyAnchor(const char *,const char *manName,
     // the name of the link file is derived from the name of the anchor:
     // - truncate after an (optional) ::
     QCString baseName = name;
-    int i=baseName.findRev(':');
+    int i=baseName.findRev("::");
     if (i!=-1) baseName=baseName.right(baseName.length()-i-1);
     
     // - remove dangerous characters and append suffix, then add dir prefix

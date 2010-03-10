@@ -1,6 +1,6 @@
 /******************************************************************************
  *
- * Copyright (C) 1997-2008 by Dimitri van Heesch.
+ * Copyright (C) 1997-2010 by Dimitri van Heesch.
  *
  * Permission to use, copy, modify, and distribute this software and its
  * documentation under the terms of the GNU General Public License is hereby 
@@ -6618,6 +6618,7 @@ static void addEnumValuesToEnums(EntryNav *rootNav)
                   fmd->setMaxInitLines(root->initLines);
                   fmd->setMemberGroupId(root->mGrpId);
                   fmd->setExplicitExternal(root->explicitExternal);
+                  fmd->setRefItems(root->sli);
                   if (fmd)
                   {
                     md->insertEnumField(fmd);
@@ -7738,6 +7739,16 @@ static void findDirDocumentation(EntryNav *rootNav)
 
     QCString normalizedName = root->name;
     normalizedName = substitute(normalizedName,"\\","/");
+    //printf("root->docFile=%s normalizedName=%s\n",
+    //    root->docFile.data(),normalizedName.data());
+    if (root->docFile==normalizedName) // current dir?
+    {
+      int lastSlashPos=normalizedName.findRev('/'); 
+      if (lastSlashPos!=-1) // strip file name
+      {
+        normalizedName=normalizedName.left(lastSlashPos);
+      }
+    }
     if (normalizedName.at(normalizedName.length()-1)!='/')
     {
       normalizedName+='/';
@@ -7775,7 +7786,7 @@ static void findDirDocumentation(EntryNav *rootNav)
     else
     {
       warn(root->fileName,root->startLine,"Warning: No matching "
-          "directory found for command \\dir %s\n",root->name.data());
+          "directory found for command \\dir %s\n",normalizedName.data());
     }
     rootNav->releaseEntry();
   }
@@ -8030,7 +8041,7 @@ static void buildExampleList(EntryNav *rootNav)
     {
       PageDef *pd=new PageDef(root->fileName,root->startLine,
           root->name,root->brief+root->doc+root->inbodyDocs,root->args);
-      pd->setFileName(convertNameToFile(pd->name()+"-example"));
+      pd->setFileName(convertNameToFile(pd->name()+"-example",TRUE,FALSE));
       pd->addSectionsToDefinition(root->anchors);
       //pi->addSections(root->anchors);
 
@@ -8421,37 +8432,6 @@ static void readTagFile(Entry *root,const char *tl)
 }
 
 //----------------------------------------------------------------------------
-// returns TRUE if the name of the file represented by `fi' matches
-// one of the file patterns in the `patList' list.
-
-static bool patternMatch(QFileInfo *fi,QStrList *patList)
-{
-  bool found=FALSE;
-  if (patList)
-  { 
-    QCString pattern=patList->first();
-    while (!pattern.isEmpty() && !found)
-    {
-      int i=pattern.find('=');
-      if (i!=-1) pattern=pattern.left(i); // strip of the extension specific filter name
-
-#if defined(_WIN32) // windows
-      QRegExp re(pattern,FALSE,TRUE); // case insensitive match 
-#else                // unix
-      QRegExp re(pattern,TRUE,TRUE);  // case sensitive match
-#endif
-      found = found || re.match(fi->fileName())!=-1 || 
-                       re.match(fi->filePath())!=-1 ||
-                       re.match(fi->absFilePath())!=-1;
-      //printf("Matching `%s' against pattern `%s' found=%d\n",
-      //    fi->fileName().data(),pattern.data(),found);
-      pattern=patList->next();
-    }
-  }
-  return found;
-}
-
-//----------------------------------------------------------------------------
 static void copyStyleSheet()
 {
   QCString &htmlStyleSheet = Config_getString("HTML_STYLESHEET");
@@ -8660,8 +8640,8 @@ int readDir(QFileInfo *fi,
         }
         else if (cfi->isFile() && 
             (!Config_getBool("EXCLUDE_SYMLINKS") || !cfi->isSymLink()) &&
-            (patList==0 || patternMatch(cfi,patList)) && 
-            !patternMatch(cfi,exclPatList) &&
+            (patList==0 || patternMatch(*cfi,patList)) && 
+            !patternMatch(*cfi,exclPatList) &&
             (killDict==0 || killDict->find(cfi->absFilePath())==0)
             )
         {
@@ -8696,7 +8676,7 @@ int readDir(QFileInfo *fi,
         else if (recursive &&
             (!Config_getBool("EXCLUDE_SYMLINKS") || !cfi->isSymLink()) &&
             cfi->isDir() && cfi->fileName()!="." && 
-            !patternMatch(cfi,exclPatList) &&
+            !patternMatch(*cfi,exclPatList) &&
             cfi->fileName()!="..")
         {
           cfi->setFile(cfi->absFilePath());
@@ -8987,7 +8967,7 @@ void dumpConfigAsXML()
 
 static void usage(const char *name)
 {
-  msg("Doxygen version %s\nCopyright Dimitri van Heesch 1997-2008\n\n",versionString);
+  msg("Doxygen version %s\nCopyright Dimitri van Heesch 1997-2010\n\n",versionString);
   msg("You can use doxygen in a number of ways:\n\n");
   msg("1) Use doxygen to generate a template configuration file:\n");
   msg("    %s [-s] -g [configName]\n\n",name);
@@ -10047,14 +10027,12 @@ void parseInput()
   msg("Computing class relations...\n");
   computeTemplateClassRelations(); 
   flushUnresolvedRelations();
+
+  computeClassRelations();        
+
   if (Config_getBool("OPTIMIZE_OUTPUT_VHDL"))
-  {
     VhdlDocGen::computeVhdlComponentRelations();
-  }
-  else
-  {
-    computeClassRelations();        
-  }
+
   g_classEntries.clear();          
 
   msg("Add enum values to enums...\n");
@@ -10289,21 +10267,19 @@ void generateOutput()
   // generate search indices (need to do this before writing other HTML
   // pages as these contain a drop down menu with options depending on
   // what categories we find in this function.
-  if (searchEngine)
+  if (Config_getBool("GENERATE_HTML") && searchEngine)
   {
     QCString searchDirName = Config_getString("HTML_OUTPUT")+"/search";
     QDir searchDir(searchDirName);
     if (!searchDir.exists() && !searchDir.mkdir(searchDirName))
     {
-      err("Could not create search results directory '%s/search'\n",searchDirName.data());
-      return;
+      err("Error: Could not create search results directory '%s' $PWD='%s'\n",
+          searchDirName.data(),QDir::currentDirPath().data());
+      exit(1);
     }
     HtmlGenerator::writeSearchData(searchDirName);
     writeSearchStyleSheet();
-    if (serverBasedSearch)
-    {
-    }
-    else
+    if (!serverBasedSearch) // client side search index
     {
       writeJavascriptSearchIndex();
     }
