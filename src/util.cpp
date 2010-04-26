@@ -2255,6 +2255,16 @@ QCString fileToString(const char *name,bool filter)
 
 QCString dateToString(bool includeTime)
 {
+  QDateTime current = QDateTime::currentDateTime();
+  return theTranslator->trDateTime(current.date().year(),
+                                   current.date().month(),
+                                   current.date().day(),
+                                   current.date().dayOfWeek(),
+                                   current.time().hour(),
+                                   current.time().minute(),
+                                   current.time().second(),
+                                   includeTime);
+#if 0
   if (includeTime)
   {
     return convertToQCString(QDateTime::currentDateTime().toString());
@@ -2269,6 +2279,7 @@ QCString dateToString(bool includeTime)
         d.year());
     return result;
   }
+#endif
 }
 
 QCString yearToString()
@@ -3572,19 +3583,21 @@ static void findMembersWithSpecificName(MemberName *mn,
                                         bool checkCV,
                                         QList<MemberDef> &members)
 {
-  //printf("  Function with global scope name `%s' args=`%s'\n",memberName.data(),args);
+  //printf("  Function with global scope name `%s' args=`%s'\n",
+  //       mn->memberName(),args);
   MemberListIterator mli(*mn);
   MemberDef *md;
   for (mli.toFirst();(md=mli.current());++mli)
   {
     FileDef  *fd=md->getFileDef();
     GroupDef *gd=md->getGroupDef();
-    //printf("  md->name()=`%s' md->args=`%s' fd=%p gd=%p\n",
-    //    md->name().data(),args,fd,gd);
+    //printf("  md->name()=`%s' md->args=`%s' fd=%p gd=%p current=%p\n",
+    //    md->name().data(),args,fd,gd,currentFile);
     if (
         ((gd && gd->isLinkable()) || (fd && fd->isLinkable())) && 
         md->getNamespaceDef()==0 && md->isLinkable() &&
-        (!checkStatics || !md->isStatic() || currentFile==0 || fd==currentFile) // statics must appear in the same file
+        (!checkStatics || (!md->isStatic() && !md->isDefine()) || 
+         currentFile==0 || fd==currentFile) // statics must appear in the same file
        )
     {
       //printf("    fd=%p gd=%p args=`%s'\n",fd,gd,args);
@@ -3682,7 +3695,7 @@ bool getDefs(const QCString &scName,const QCString &memberName,
   //printf("mName=%s mn=%p\n",mName.data(),mn);
   if (!forceEmptyScope && mn && !(scopeName.isEmpty() && mScope.isEmpty()))
   {
-    //printf("  >member name found\n");
+    //printf("  >member name '%s' found\n",mName.data());
     int scopeOffset=scopeName.length();
     do
     {
@@ -3693,13 +3706,13 @@ bool getDefs(const QCString &scName,const QCString &memberName,
       }
       else if (!mScope.isEmpty())
       {
-        className=mScope.copy();
+        className=mScope;
       }
-      //printf("Trying class scope %s\n",className.data());
 
-      ClassDef *fcd=0;
+      ClassDef *fcd=getResolvedClass(Doxygen::globalScope,0,className);
+      //printf("Trying class scope %s: %p\n",className.data(),fcd);
       // todo: fill in correct fileScope!
-      if ((fcd=getResolvedClass(Doxygen::globalScope,0,className)) &&  // is it a documented class
+      if (fcd &&  // is it a documented class
           fcd->isLinkable() 
          )
       {
@@ -3952,44 +3965,6 @@ bool getDefs(const QCString &scName,const QCString &memberName,
         // search again without strict static checking
         findMembersWithSpecificName(mn,args,FALSE,currentFile,checkCV,members);
       }
-
-#if 0
-      //printf("  Function with global scope name `%s' args=`%s'\n",memberName.data(),args);
-      MemberListIterator mli(*mn);
-      for (mli.toFirst();(md=mli.current());++mli)
-      {
-        fd=md->getFileDef();
-        gd=md->getGroupDef();
-        //printf("  md->name()=`%s' md->args=`%s' fd=%p gd=%p\n",
-        //    md->name().data(),args,fd,gd);
-        if (
-            ((gd && gd->isLinkable()) || (fd && fd->isLinkable())) && 
-            md->getNamespaceDef()==0 && md->isLinkable() &&
-            (!md->isStatic() || fd==currentFile) // statics must appear in the same file
-           )
-        {
-          //printf("    fd=%p gd=%p args=`%s'\n",fd,gd,args);
-          bool match=TRUE;
-          ArgumentList *argList=0;
-          if (args && !md->isDefine() && strcmp(args,"()")!=0)
-          {
-            argList=new ArgumentList;
-            LockingPtr<ArgumentList> mdAl = md->argumentList();
-            stringToArgumentList(args,argList);
-            match=matchArguments2(
-                md->getOuterScope(),fd,mdAl.pointer(),
-                Doxygen::globalScope,fd,argList,
-                checkCV); 
-            delete argList; argList=0;
-          }
-          if (match) 
-          {
-            //printf("Found match!\n");
-            members.append(md);
-          }
-        }
-      }
-#endif
       if (members.count()!=1 && args && !strcmp(args,"()"))
       {
         // no exact match found, but if args="()" an arbitrary 
@@ -5789,7 +5764,7 @@ PageDef *addRelatedPage(const char *name,const QCString &ptitle,
       pd->setReference(tagInfo->tagName);
     }
 
-    pd->setFileName(convertNameToFile(pd->name(),TRUE,FALSE));
+    pd->setFileName(convertNameToFile(pd->name()));
 
     //printf("Appending page `%s'\n",baseName.data());
     Doxygen::pageSDict->append(baseName,pd);
@@ -7000,6 +6975,25 @@ bool patternMatch(const QFileInfo &fi,const QStrList *patList)
     }
   }
   return found;
+}
+
+void writeSummaryLink(OutputList &ol,const char *label,const char *title,
+                      bool &first)
+{
+  if (first)
+  {
+    ol.writeString("  <div class=\"summary\">\n");
+    first=FALSE;
+  }
+  else
+  {
+    ol.writeString(" &#124;\n");
+  }
+  ol.writeString("<a href=\"#");
+  ol.writeString(label);
+  ol.writeString("\">");
+  ol.writeString(title);
+  ol.writeString("</a>");
 }
 
 

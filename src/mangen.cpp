@@ -255,7 +255,7 @@ void ManGenerator::endGroupHeader()
   upperCase=FALSE;
 }
 
-void ManGenerator::startMemberHeader()
+void ManGenerator::startMemberHeader(const char *)
 {
   if (!firstCol) t << endl;
   t << ".SS \"";
@@ -409,7 +409,10 @@ void ManGenerator::startDoxyAnchor(const char *,const char *manName,
     // - truncate after an (optional) ::
     QCString baseName = name;
     int i=baseName.findRev("::");
-    if (i!=-1) baseName=baseName.right(baseName.length()-i-1);
+    if (i!=-1) baseName=baseName.right(baseName.length()-i-2);
+
+    //printf("Converting man link '%s'->'%s'->'%s'\n",
+    //       name,baseName.data(),buildFileName(baseName).data());
     
     // - remove dangerous characters and append suffix, then add dir prefix
     QCString fileName=dir+"/"+buildFileName( baseName );
@@ -585,9 +588,9 @@ void ManGenerator::startSection(const char *,const char *,SectionInfo::SectionTy
     {
       case SectionInfo::Page:          startGroupHeader(); break;
       case SectionInfo::Section:       startGroupHeader(); break;
-      case SectionInfo::Subsection:    startMemberHeader(); break;
-      case SectionInfo::Subsubsection: startMemberHeader(); break;
-      case SectionInfo::Paragraph:     startMemberHeader(); break;
+      case SectionInfo::Subsection:    startMemberHeader(0); break;
+      case SectionInfo::Subsubsection: startMemberHeader(0); break;
+      case SectionInfo::Paragraph:     startMemberHeader(0); break;
       default: ASSERT(0); break;
     }
   }

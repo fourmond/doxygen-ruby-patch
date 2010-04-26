@@ -185,7 +185,7 @@ void LatexDocVisitor::visit(DocSymbol *s)
                                m_t << "\\^{" << s->letter() << "}"; 
                              break;
     case DocSymbol::Slash:   if (tolower(s->letter())=='o')
-                               m_t << "\\" << s->letter();
+                               m_t << "{\\" << s->letter() << "}";
                              else
                                m_t << s->letter();
                              break;
@@ -1360,20 +1360,17 @@ void LatexDocVisitor::endDotFile(bool hasCaption)
 
 void LatexDocVisitor::writeMscFile(const QString &baseName)
 {
+  QString shortName = baseName;
+  int i;
+  if ((i=shortName.findRev('/'))!=-1)
+  {
+    shortName=shortName.right(shortName.length()-i-1);
+  } 
   QString outDir = Config_getString("LATEX_OUTPUT");
   writeMscGraphFromFile(baseName,outDir,baseName,MSC_EPS);
   m_t << "\n\\begin{DoxyImageNoCaption}"
          "  \\mbox{\\includegraphics";
-  //if (!width.isEmpty())
-  //{
-  //  m_t << "[width=" << width << "]";
-  //}
-  //else if (!height.isEmpty())
-  //{
-  //  m_t << "[height=" << height << "]";
-  //}
-  m_t << "{" << baseName << "}";
-
+  m_t << "{" << shortName << "}";
   m_t << "}\n"; // end mbox
   m_t << "\\end{DoxyImageNoCaption}\n";
 }

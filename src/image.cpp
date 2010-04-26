@@ -20,7 +20,9 @@
 #include "image.h"
 //#include "gifenc.h"
 #include <qfile.h>
+#include <math.h>
 #include "lodepng.h"
+#include "config.h"
 
 typedef unsigned char  Byte;
 
@@ -209,6 +211,33 @@ static Color palette2[] =
 
 Image::Image(int w,int h)
 {
+  static int hue   = Config_getInt("HTML_COLORSTYLE_HUE");
+  static int sat   = Config_getInt("HTML_COLORSTYLE_SAT");
+  static int gamma = Config_getInt("HTML_COLORSTYLE_GAMMA");
+
+  double red1,green1,blue1;
+  double red2,green2,blue2;
+
+  ColoredImage::hsl2rgb(hue/360.0,                  // hue
+                        sat/255.0,                  // saturation
+                        pow(235/255.0,gamma/100.0), // luma (gamma corrected)
+                        &red1,&green1,&blue1
+                       );
+
+  ColoredImage::hsl2rgb(hue/360.0,                  // hue
+                        sat/255.0,                  // saturation
+                        pow(138/255.0,gamma/100.0), // luma (gamma corrected)
+                        &red2,&green2,&blue2
+                       );
+
+  palette[2].red   = (int)(red1   * 255.0);
+  palette[2].green = (int)(green1 * 255.0);
+  palette[2].blue  = (int)(blue1  * 255.0);
+
+  palette[3].red   = (int)(red2   * 255.0);
+  palette[3].green = (int)(green2 * 255.0);
+  palette[3].blue  = (int)(blue2  * 255.0);
+
   data = new uchar[w*h];
   memset(data,0,w*h);
   width = w;
@@ -392,4 +421,119 @@ bool Image::save(const char *fileName,int mode)
   LodePNG_Encoder_cleanup(&encoder);
   return TRUE;
 }
+
+//----------------------------------------------------------------
+
+void ColoredImage::hsl2rgb(double h,double s,double l,
+                         double *pRed,double *pGreen,double *pBlue)
+{
+  double v;
+  double r,g,b;
+
+  r = l;   // default to gray
+  g = l;
+  b = l;
+  v = (l <= 0.5) ? (l * (1.0 + s)) : (l + s - l * s);
+  if (v > 0)
+  {
+    double m;
+    double sv;
+    int sextant;
+    double fract, vsf, mid1, mid2;
+
+    m       = l + l - v;
+    sv      = (v - m ) / v;
+    h      *= 6.0;
+    sextant = (int)h;
+    fract   = h - sextant;
+    vsf     = v * sv * fract;
+    mid1    = m + vsf;
+    mid2    = v - vsf;
+    switch (sextant)
+    {
+      case 0:
+        r = v;
+        g = mid1;
+        b = m;
+        break;
+      case 1:
+        r = mid2;
+        g = v;
+        b = m;
+        break;
+      case 2:
+        r = m;
+        g = v;
+        b = mid1;
+        break;
+      case 3:
+        r = m;
+        g = mid2;
+        b = v;
+        break;
+      case 4:
+        r = mid1;
+        g = m;
+        b = v;
+        break;
+      case 5:
+        r = v;
+        g = m;
+        b = mid2;
+        break;
+    }
+  }
+  *pRed   = r;
+  *pGreen = g;
+  *pBlue  = b;
+}
+
+ColoredImage::ColoredImage(int width,int height,
+           const uchar *greyLevels,const uchar *alphaLevels,
+           int saturation,int hue,int gamma)
+{
+  m_hasAlpha = alphaLevels!=0;
+  m_width    = width;
+  m_height   = height;
+  m_data     = (uchar*)malloc(width*height*4);
+  int i;
+  for (i=0;i<width*height;i++)
+  {
+    uchar r,g,b,a;
+    double red,green,blue;
+    hsl2rgb(hue/360.0,                            // hue
+            saturation/255.0,                     // saturation
+            pow(greyLevels[i]/255.0,gamma/100.0), // luma (gamma corrected)
+            &red,&green,&blue);
+    r = (int)(red  *255.0);
+    g = (int)(green*255.0);
+    b = (int)(blue *255.0);
+    a = alphaLevels ? alphaLevels[i] : 255;
+    m_data[i*4+0]=r;
+    m_data[i*4+1]=g;
+    m_data[i*4+2]=b;
+    m_data[i*4+3]=a;
+  }
+}
+
+ColoredImage::~ColoredImage()
+{
+  free(m_data);
+}
+
+bool ColoredImage::save(const char *fileName)
+{
+  uchar *buffer;
+  size_t bufferSize;
+  LodePNG_Encoder encoder;
+  LodePNG_Encoder_init(&encoder);
+  encoder.infoPng.color.colorType = m_hasAlpha ? 6 : 2; // 2=RGB 24 bit, 6=RGBA 32 bit
+  encoder.infoRaw.color.colorType = 6; // 6=RGBA 32 bit
+  LodePNG_encode(&encoder, &buffer, &bufferSize, m_data, m_width, m_height);
+  LodePNG_saveFile(buffer, bufferSize, fileName);
+  LodePNG_Encoder_cleanup(&encoder);
+  free(buffer);
+  return TRUE;
+}
+
 
