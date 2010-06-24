@@ -44,7 +44,14 @@ HEADERS		= qarray.h \
                   qxml.h \
                   qvaluestack.h \
                   qmap.h \
-		  qmodules.h
+		  qmodules.h \
+		  qthread.h \
+		  qthread_p.h \
+		  qmutex.h \
+		  qmutex_p.h \
+                  qutfcodec.h \
+		  qwaitcondition.h
+
 SOURCES		= qbuffer.cpp \
 		  qcollection.cpp \
 		  scstring.cpp \
@@ -67,18 +74,28 @@ SOURCES		= qbuffer.cpp \
 		  qtextcodec.cpp \
 		  qstringlist.cpp \
 	          qxml.cpp \
-                  qmap.cpp
+                  qmap.cpp \
+		  qthread.cpp \
+		  qmutex.cpp \
+                  qutfcodec.cpp
 
 unix:SOURCES +=   qfile_unix.cpp \
 		  qdir_unix.cpp \
-		  qfileinfo_unix.cpp
+		  qfileinfo_unix.cpp \
+		  qthread_unix.cpp \
+		  qmutex_unix.cpp \
+		  qwaitcondition_unix.cpp
 
 win32:SOURCES +=  qfile_win32.cpp \
 		  qdir_win32.cpp \
-		  qfileinfo_win32.cpp
+		  qfileinfo_win32.cpp \
+		  qthread_win32.cpp \
+		  qmutex_win32.cpp \
+		  qwaitcondition_win32.cpp
 
 INCLUDEPATH = .
-TMAKE_CXXFLAGS += -DQT_NO_CODECS -DQT_LITE_UNICODE
+#TMAKE_CXXFLAGS += -DQT_NO_CODECS -DQT_LITE_UNICODE
+TMAKE_CXXFLAGS += -DQT_LITE_UNICODE
 win32:TMAKE_CXXFLAGS += -DQT_NODLL
 win32-g++:TMAKE_CXXFLAGS += -D__CYGWIN__ -DALL_STATIC
 OBJECTS_DIR = ../objects

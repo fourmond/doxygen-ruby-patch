@@ -92,8 +92,9 @@ FileDef::FileDef(const char *p,const char *nm,
   {
     docname.prepend(stripFromPath(path.copy()));
   }
-  m_isJava          = name().right(5)==".java";
-  m_isCSharp        = name().right(5)==".cs";
+  SrcLangExt lang   = getLanguageFromFileName(name());
+  m_isJava          = lang==SrcLangExt_Java;
+  m_isCSharp        = lang==SrcLangExt_CSharp;
   memberGroupSDict = 0;
   acquireFileVersion();
   m_subGrouping=Config_getBool("SUBGROUPING");
@@ -263,10 +264,8 @@ void FileDef::writeIncludeFiles(OutputList &ol)
       bool isIDLorJava = FALSE;
       if (fd)
       {
-        isIDLorJava = fd->name().right(4)==".idl" ||   // M$ or Corba IDL
-                      fd->name().right(5)==".pidl" ||
-                      fd->name().right(5)==".java" ||  // Sun's Java
-                      fd->name().right(4)==".jsl";     // M$ J#
+        SrcLangExt lang   = getLanguageFromFileName(fd->name());
+        isIDLorJava = lang==SrcLangExt_IDL || lang==SrcLangExt_Java;
       }
       ol.startTypewriter();
       if (isIDLorJava) // IDL/Java include
@@ -1533,17 +1532,31 @@ void FileDef::addMemberToList(MemberList::ListType lt,MemberDef *md)
   static bool sortBriefDocs = Config_getBool("SORT_BRIEF_DOCS");
   static bool sortMemberDocs = Config_getBool("SORT_MEMBER_DOCS");
   MemberList *ml = createMemberList(lt);
-  if (((ml->listType()&MemberList::declarationLists) && sortBriefDocs) ||
-      ((ml->listType()&MemberList::documentationLists) && sortMemberDocs)
-     )
+  ml->setNeedsSorting(
+       ((ml->listType()&MemberList::declarationLists) && sortBriefDocs) ||
+       ((ml->listType()&MemberList::documentationLists) && sortMemberDocs));
+  ml->append(md);
+#if 0
+  if (ml->needsSorting())
     ml->inSort(md);
   else
     ml->append(md);
+#endif
   if (lt&MemberList::documentationLists)
   {
     ml->setInFile(TRUE);
   }
   if (ml->listType()&MemberList::declarationLists) md->setSectionList(this,ml);
+}
+
+void FileDef::sortMemberLists()
+{
+  MemberList *ml = m_memberLists.first();
+  while (ml)
+  {
+    if (ml->needsSorting()) { ml->sort(); ml->setNeedsSorting(FALSE); }
+    ml = m_memberLists.next();
+  }
 }
 
 MemberList *FileDef::getMemberList(MemberList::ListType lt) const

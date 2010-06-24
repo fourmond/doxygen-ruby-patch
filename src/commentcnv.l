@@ -67,6 +67,7 @@ static bool     g_specialComment;
 
 static QCString g_aliasString;
 static int      g_blockCount;
+static bool     g_lastEscaped;
 static int      g_lastBlockContext;
 static bool     g_pythonDocString;
 
@@ -321,7 +322,7 @@ void replaceComment(int offset);
   				     int i=3;
 				     if (yytext[2]=='/')
 				     {
-				       while (i<yyleng && yytext[i]=='/') i++;
+				       while (i<(int)yyleng && yytext[i]=='/') i++;
 				     }
 				     g_blockHeadCol=g_col;
                                      copyToOutput("/**",3); 
@@ -696,30 +697,43 @@ void replaceComment(int offset);
                                      g_lastBlockContext=YY_START;
 				     g_blockCount=1;
 				     g_aliasString=yytext;
+				     g_lastEscaped=0;
 				     BEGIN( ReadAliasArgs );
   				   }
-<ReadAliasArgs>[^{}\n\*]+	   {
-                                     g_aliasString+=yytext;
+<ReadAliasArgs>^[ \t]*"//"[/!]/[^\n]+   { // skip leading special comments (see bug 618079)
   				   }
+<ReadAliasArgs>[^{}\n\\\*]+	   {
+                                     g_aliasString+=yytext;
+				     g_lastEscaped=FALSE;
+  				   }
+<ReadAliasArgs>"\\"		   {
+                                     if (g_lastEscaped)  g_lastEscaped=FALSE;
+                                     else                g_lastEscaped=TRUE;
+                                     g_aliasString+=yytext;
+                                   }
 <ReadAliasArgs>\n		   {
                                      g_aliasString+=yytext;
                                      g_lineNr++;
+				     g_lastEscaped=FALSE;
   				   }
 <ReadAliasArgs>"{"		   {
                                      g_aliasString+=yytext;
-                                     g_blockCount++;
+                                     if (!g_lastEscaped) g_blockCount++;
+				     g_lastEscaped=FALSE;
                                    }
 <ReadAliasArgs>"}"		   {
                                      g_aliasString+=yytext;
-                                     g_blockCount--;
+				     if (!g_lastEscaped) g_blockCount--;
 				     if (g_blockCount==0)
 				     {
 				       replaceAliases(g_aliasString);
 				       BEGIN( g_lastBlockContext );
 				     }
+				     g_lastEscaped=FALSE;
   			           }
 <ReadAliasArgs>.		   {
                                      g_aliasString+=yytext;
+				     g_lastEscaped=FALSE;
   				   }
 <ReadLine>.			   {
   				     copyToOutput(yytext,yyleng);

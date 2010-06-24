@@ -322,8 +322,8 @@ void addConfigOptions(Config *cfg)
                  "parses. With this tag you can assign which parser to use for a given extension.\n"
                  "Doxygen has a built-in mapping, but you can override or extend it using this\n"
                  "tag. The format is ext=language, where ext is a file extension, and language\n"
-                 "is one of the parsers supported by doxygen: IDL, Java, Javascript, C#, C, C++,\n"
-                 "D, PHP, Objective-C, Python, Fortran, VHDL, C, C++. For instance to make\n"
+                 "is one of the parsers supported by doxygen: IDL, Java, Javascript, CSharp, C,\n"
+                 "C++, D, PHP, Objective-C, Python, Fortran, VHDL, C, C++. For instance to make\n"
                  "doxygen treat .inc files as Fortran files (default is PHP), and .f files as C\n"
                  "(default is Fortran), use: inc=Fortran f=C. Note that for custom extensions\n"
                  "you also need to set FILE_PATTERNS otherwise the files are not read by doxygen."
@@ -1034,7 +1034,7 @@ void addConfigOptions(Config *cfg)
                  "If the ALPHABETICAL_INDEX tag is set to YES, an alphabetical index\n"
                  "of all compounds will be generated. Enable this if the project\n"
                  "contains a lot of classes, structs, unions or interfaces.",
-                 FALSE
+                 TRUE
                 );
   //----
   ci = cfg->addInt(
@@ -1209,6 +1209,22 @@ void addConfigOptions(Config *cfg)
                  "will append .docset to the name."
                 );
   cs->setDefaultValue("org.doxygen.Project");
+  cs->addDependency("GENERATE_DOCSET");
+  //----
+  cs = cfg->addString(
+                 "DOCSET_PUBLISHER_ID",
+                 "When GENERATE_PUBLISHER_ID tag specifies a string that should uniquely identify\n"
+                 "the documentation publisher. This should be a reverse domain-name style\n"
+                 "string, e.g. com.mycompany.MyDocSet.documentation."
+                );
+  cs->setDefaultValue("org.doxygen.Publisher");
+  cs->addDependency("GENERATE_DOCSET");
+  //----
+  cs = cfg->addString(
+                 "DOCSET_PUBLISHER_NAME",
+                 "The GENERATE_PUBLISHER_NAME tag identifies the documentation publisher."
+                );
+  cs->setDefaultValue("Publisher");
   cs->addDependency("GENERATE_DOCSET");
   //----
   cb = cfg->addBool(
@@ -1418,6 +1434,14 @@ void addConfigOptions(Config *cfg)
                  0,1500,250
                 );
   ci->addDependency("GENERATE_HTML");
+  //----
+  cb = cfg->addBool(
+                 "EXT_LINKS_IN_WINDOW",
+                 "When the EXT_LINKS_IN_WINDOW option is set to YES doxygen will open\n"
+                 "links to external symbols imported via tag files in a separate window.",
+                 FALSE
+                );
+  cb->addDependency("GENERATE_HTML");
   //----
   ci = cfg->addInt(
                  "FORMULA_FONTSIZE",
@@ -1981,6 +2005,16 @@ void addConfigOptions(Config *cfg)
                  FALSE
                 );
   //----
+  ci = cfg->addInt(
+                 "DOT_NUM_THREADS",
+                 "The DOT_NUM_THREADS specifies the number of dot invocations doxygen is\n"
+                 "allowed to run in parallel. When set to 0 (the default) doxygen will\n"
+                 "base this on the number of processors available in the system. You can set it\n"
+                 "explicitly to a value larger than 0 to get control over the balance\n"
+                 "between CPU load and processing speed.",
+                 0,32,0
+                );
+  //----
   cs = cfg->addString(
                  "DOT_FONTNAME",
                  "By default doxygen will write a font called FreeSans.ttf to the output\n"
@@ -1992,7 +2026,7 @@ void addConfigOptions(Config *cfg)
                  "DOTFONTPATH environment variable or by setting DOT_FONTPATH to the directory\n"
                  "containing the font."
                 );
-  cs->setDefaultValue("FreeSans");
+  cs->setDefaultValue("FreeSans.ttf");
   cs->addDependency("HAVE_DOT");
   //----
   ci = cfg->addInt(

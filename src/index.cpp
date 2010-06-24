@@ -716,17 +716,20 @@ void writeHierarchicalIndex(OutputList &ol)
   FTVHelp* ftv = 0;
   bool treeView=Config_getBool("USE_INLINE_TREES");
   if (treeView)
-    ftv = new FTVHelp(false);
+  {
+    ftv = new FTVHelp(FALSE);
+  }
 
   writeClassHierarchy(ol,ftv);
 
   if (ftv)
   {
-    QString OutStr;
-    ftv->generateTreeView(&OutStr);
+    QGString outStr;
+    FTextStream t(&outStr);
+    ftv->generateTreeViewInline(t);
     ol.pushGeneratorState(); 
     ol.disableAllBut(OutputGenerator::Html);
-    ol.writeString(OutStr);
+    ol.writeString(outStr);
     ol.popGeneratorState();
     delete ftv;
   }
@@ -1234,7 +1237,7 @@ void writeAlphabeticalClassList(OutputList &ol)
     {
       int index = getPrefixIndex(cd->className());
       //printf("name=%s index=%d\n",cd->className().data(),index);
-      startLetter=toupper(cd->className().at(index));
+      startLetter=toupper(cd->className().at(index))&0xFF;
       indexLetterUsed[startLetter] = true;
     }
   }
@@ -2446,7 +2449,7 @@ static QCString searchId(const QCString &s)
     else
     {
       char val[4];
-      sprintf(val,"_%02x",c);
+      sprintf(val,"_%02x",(uchar)c);
       result+=val;
     }
   }
@@ -2640,32 +2643,21 @@ void writeJavascriptSearchIndex()
                 << "onkeyup=\""
                 << "return searchResults.Nav(event," << itemCount << ")\" "
                 << "class=\"SRSymbol\" ";
-              if (!d->getReference().isEmpty())
-              {
-                QCString *dest = Doxygen::tagDestinationDict[d->getReference()];
-                if (dest && *dest=='.') // relative path (see bug 593679)
-                {
-                  t << "doxygen=\"" << d->getReference() << ":../"
-                    << *dest << "/\" href=\"../" << *dest << "/";
-                }
-                else if (dest) // absolute path
-                {
-                  t << "doxygen=\"" << d->getReference() << ":"
-                    << *dest << "/\" href=\"" << *dest << "/";
-                }
-              }
-              else
-              {
-                t << "href=\"../";
-              }
+              t << externalLinkTarget() << "href=\"" << externalRef("../",d->getReference(),TRUE);
               t << d->getOutputFileBase() << Doxygen::htmlFileExtension;
               if (isMemberDef)
               {
                 t << "#" << ((MemberDef *)d)->anchor();
               }
-              t << "\" target=\""; 
-              if (treeView) t << "basefrm"; else t << "_parent"; 
-              t << "\">";
+              t << "\"";
+              static bool extLinksInWindow = Config_getBool("EXT_LINKS_IN_WINDOW");
+              if (!extLinksInWindow || d->getReference().isEmpty())
+              {
+                t << " target=\""; 
+                if (treeView) t << "basefrm"; else t << "_parent"; 
+                t << "\"";
+              }
+              t << ">";
               t << convertToXML(d->localName());
               t << "</a>" << endl;
               if (d->getOuterScope()!=Doxygen::globalScope)
@@ -2730,25 +2722,23 @@ void writeJavascriptSearchIndex()
                   << "class=\"SRScope\" ";
                 if (!d->getReference().isEmpty())
                 {
-                  QCString *dest;
-                  t << "doxygen=\"" << d->getReference() << ":../";
-                  if ((dest=Doxygen::tagDestinationDict[d->getReference()])) t << *dest << "/";
-                  t << "\" ";
-                  t << "href=\"../";
-                  if ((dest=Doxygen::tagDestinationDict[d->getReference()])) t << *dest << "/";
+                  t << externalLinkTarget() << externalRef("../",d->getReference(),FALSE);
                 }
-                else
-                {
-                  t << "href=\"../";
-                }
+                t << "href=\"" << externalRef("../",d->getReference(),TRUE);
                 t << d->getOutputFileBase() << Doxygen::htmlFileExtension;
                 if (isMemberDef)
                 {
                   t << "#" << ((MemberDef *)d)->anchor();
                 }
-                t << "\" target=\"";
-                if (treeView) t << "basefrm"; else t << "_parent"; 
-                t << "\">";
+                t << "\"";
+                static bool extLinksInWindow = Config_getBool("EXT_LINKS_IN_WINDOW");
+                if (!extLinksInWindow || d->getReference().isEmpty())
+                {
+                  t << " target=\"";
+                  if (treeView) t << "basefrm"; else t << "_parent"; 
+                  t << "\"";
+                }
+                t << ">";
                 bool found=FALSE;
                 overloadedFunction = ((prevScope!=0 && scope==prevScope) ||
                                       (scope && scope==nextScope)
@@ -2919,7 +2909,7 @@ void writeJavascriptSearchIndex()
   Doxygen::indexList.addStyleSheetFile("search/search.js");
 }
 
-void writeSearchCategories(QTextStream &t)
+void writeSearchCategories(FTextStream &t)
 {
   static SearchIndexCategoryMapping map;
   int i,j=0;
@@ -3525,7 +3515,7 @@ void writeGroupIndex(OutputList &ol)
   bool treeView=Config_getBool("USE_INLINE_TREES");
   if (treeView)
   {
-    ftv = new FTVHelp(false);
+    ftv = new FTVHelp(FALSE);
   }
 
   writeGroupHierarchy(ol,ftv);
@@ -3533,11 +3523,12 @@ void writeGroupIndex(OutputList &ol)
   Doxygen::indexList.decContentsDepth();
   if (ftv)
   {
-    QString OutStr;
-    ftv->generateTreeView(&OutStr);
+    QGString outStr;
+    FTextStream t(&outStr);
+    ftv->generateTreeViewInline(t);
     ol.pushGeneratorState(); 
     ol.disableAllBut(OutputGenerator::Html);
-    ol.writeString(OutStr);
+    ol.writeString(outStr);
     ol.popGeneratorState();
     delete ftv;
   }
@@ -3571,17 +3562,20 @@ void writeDirIndex(OutputList &ol)
   FTVHelp* ftv = 0;
   bool treeView=Config_getBool("USE_INLINE_TREES");
   if (treeView)
-    ftv = new FTVHelp(false);
+  {
+    ftv = new FTVHelp(FALSE);
+  }
 
   writeDirHierarchy(ol,ftv);
 
   if (ftv)
   {
-    QString OutStr;
-    ftv->generateTreeView(&OutStr);
+    QGString outStr;
+    FTextStream t(&outStr);
+    ftv->generateTreeViewInline(t);
     ol.pushGeneratorState(); 
     ol.disableAllBut(OutputGenerator::Html);
-    ol.writeString(OutStr);
+    ol.writeString(outStr);
     ol.popGeneratorState();
     delete ftv;
   }

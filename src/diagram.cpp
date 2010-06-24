@@ -21,7 +21,7 @@
 #include <stdlib.h>
 #include <qlist.h>
 #include <qarray.h>
-#include <qtextstream.h>
+#include "ftextstream.h"
 #include <qfile.h>
 
 #include "diagram.h"
@@ -142,7 +142,7 @@ static void writeBitmapBox(DiagramItem *di,Image *image,
   }
 }
 
-static void writeVectorBox(QTextStream &t,DiagramItem *di,
+static void writeVectorBox(FTextStream &t,DiagramItem *di,
                            float x,float y,bool children=FALSE)
 {
   if (di->virtualness()==Virtual) t << "dashed\n";
@@ -151,7 +151,7 @@ static void writeVectorBox(QTextStream &t,DiagramItem *di,
   if (di->virtualness()==Virtual) t << "solid\n";
 }
 
-static void writeMapArea(QTextStream &t,ClassDef *cd,QCString relPath,
+static void writeMapArea(FTextStream &t,ClassDef *cd,QCString relPath,
                          int x,int y,int w,int h)
 {
   if (cd->isLinkable())
@@ -161,19 +161,10 @@ static void writeMapArea(QTextStream &t,ClassDef *cd,QCString relPath,
     t << "<area ";
     if (!ref.isEmpty()) 
     {
-      t << "doxygen=\"" << ref << ":";
-      if ((dest=Doxygen::tagDestinationDict[ref])) t << *dest << "/";
-      t << "\" ";
+      t << externalLinkTarget() << externalRef(relPath,ref,FALSE);
     }
     t << "href=\"";
-    if (!ref.isEmpty())
-    {
-      if ((dest=Doxygen::tagDestinationDict[ref])) t << *dest << "/";
-    }
-    else
-    {
-      t << relPath;
-    }
+    t << externalRef(relPath,ref,TRUE);
     t << cd->getOutputFileBase() << Doxygen::htmlFileExtension << "\" ";
     t << "alt=\"" << convertToXML(cd->displayName()); 
     t << "\" shape=\"rect\" coords=\"" << x << "," << y << ",";
@@ -485,7 +476,7 @@ void TreeDiagram::computeExtremes(uint *maxLabelLen,uint *maxXPos)
   if (maxXPos)     *maxXPos=mx;
 }
 
-void TreeDiagram::drawBoxes(QTextStream &t,Image *image, 
+void TreeDiagram::drawBoxes(FTextStream &t,Image *image, 
                             bool doBase,bool bitmap,
                             uint baseRows,uint superRows,
                             uint cellWidth,uint cellHeight,
@@ -616,7 +607,7 @@ void TreeDiagram::drawBoxes(QTextStream &t,Image *image,
   }
 }
 
-void TreeDiagram::drawConnectors(QTextStream &t,Image *image,
+void TreeDiagram::drawConnectors(FTextStream &t,Image *image,
                                  bool doBase,bool bitmap,
                                  uint baseRows,uint superRows,
                                  uint cellWidth,uint cellHeight)
@@ -968,7 +959,7 @@ ClassDiagram::~ClassDiagram()
   delete super;
 }
 
-void ClassDiagram::writeFigure(QTextStream &output,const char *path,
+void ClassDiagram::writeFigure(FTextStream &output,const char *path,
                                const char *fileName) const
 {
   uint baseRows=base->computeRows();
@@ -1018,7 +1009,7 @@ void ClassDiagram::writeFigure(QTextStream &output,const char *path,
     err("Could not open file %s for writing\n",convertToQCString(f1.name()).data());
     exit(1);
   }
-  QTextStream t(&f1);
+  FTextStream t(&f1);
   
   //printf("writeEPS() rows=%d cols=%d\n",rows,cols);
   
@@ -1253,16 +1244,19 @@ void ClassDiagram::writeFigure(QTextStream &output,const char *path,
     epstopdfArgs.sprintf("\"%s.eps\" --outfile=\"%s.pdf\"",
                    epsBaseName.data(),epsBaseName.data());
     //printf("Converting eps using `%s'\n",epstopdfCmd.data());
+    portable_sysTimerStart();
     if (portable_system("epstopdf",epstopdfArgs)!=0)
     {
        err("Error: Problems running epstopdf. Check your TeX installation!\n");
+       portable_sysTimerStop();
        return;
     }
+    portable_sysTimerStop();
   }
 }
 
 
-void ClassDiagram::writeImage(QTextStream &t,const char *path,
+void ClassDiagram::writeImage(FTextStream &t,const char *path,
                               const char *relPath,const char *fileName, 
                               bool generateMap) const
 {

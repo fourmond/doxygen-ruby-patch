@@ -38,6 +38,7 @@
 #include "docparser.h"
 #include "dirdef.h"
 #include "vhdldocgen.h"
+#include "portable.h"
 
 //#define DBG_RTF(x) x;
 #define DBG_RTF(x)
@@ -325,7 +326,7 @@ void RTFGenerator::beginRTFSection()
 
 void RTFGenerator::startFile(const char *name,const char *,const char *)
 {
-  setEncoding(QCString().sprintf("CP%s",theTranslator->trRTFansicp().data()));
+  //setEncoding(QCString().sprintf("CP%s",theTranslator->trRTFansicp()));
   QCString fileName=name;
   relPath = relativePathToRoot(fileName);
 
@@ -1993,7 +1994,7 @@ void RTFGenerator::incrementIndentLevel()
   m_listLevel++;
   if (m_listLevel>rtf_maxIndentLevels-1)
   {
-    warn_cont("Warning: Maximum indent level (%d) exceeded while generating RTF output!\n",rtf_maxIndentLevels);
+    err("Warning: Maximum indent level (%d) exceeded while generating RTF output!\n",rtf_maxIndentLevels);
     m_listLevel=rtf_maxIndentLevels-1;
   }
 }
@@ -2003,7 +2004,7 @@ void RTFGenerator::decrementIndentLevel()
   m_listLevel--;
   if (m_listLevel<0)
   {
-    warn_cont("Warning: Negative indent level while generating RTF output!\n");
+    err("Warning: Negative indent level while generating RTF output!\n");
     m_listLevel=0;
   }
 }
@@ -2219,11 +2220,61 @@ void RTFGenerator::endMemberSubtitle()
 //  }
 //}
 //
+
+// note: function is not reentrant!
+static void encodeForOutput(FTextStream &t,const QCString &s)
+{
+  QCString encoding;
+  bool converted=FALSE;
+  int l = s.length();
+  static QByteArray enc;
+  if (l*4>(int)enc.size()) enc.resize(l*4); // worst case
+  encoding.sprintf("CP%s",theTranslator->trRTFansicp().data());
+  if (!encoding.isEmpty())
+  {
+    // convert from UTF-8 back to the output encoding
+    void *cd = portable_iconv_open(encoding,"UTF-8");
+    if (cd!=(void *)(-1))
+    {
+      size_t iLeft=l;
+      size_t oLeft=enc.size();
+      const char *inputPtr = s.data();
+      char *outputPtr = enc.data();
+      if (!portable_iconv(cd, &inputPtr, &iLeft, &outputPtr, &oLeft))
+      {
+        enc.resize(enc.size()-oLeft);
+        converted=TRUE;
+      }
+      portable_iconv_close(cd);
+    }
+  }
+  if (!converted) // if we did not convert anything, copy as is.
+  {
+    memcpy(enc.data(),s.data(),l);
+    enc.resize(l);
+  }
+  uint i;
+  for (i=0;i<enc.size();i++)
+  {
+    uchar c = (uchar)enc.at(i);
+    if (c>=0x80)
+    {
+      char esc[10];
+      sprintf(esc,"\\'%X",c);
+      t << esc;
+    }
+    else
+    {
+      t << (char)c;
+    }
+  }
+}
+
 /**
  * VERY brittle routine inline RTF's included by other RTF's.
  * it is recursive and ugly.
  */
-static bool PreProcessFile(QDir &d,QCString &infName, QTextStream &t, bool bIncludeHeader=TRUE)
+static bool preProcessFile(QDir &d,QCString &infName, FTextStream &t, bool bIncludeHeader=TRUE)
 {
   QFile f(infName);
   if (!f.open(IO_ReadOnly))
@@ -2246,11 +2297,10 @@ static bool PreProcessFile(QDir &d,QCString &infName, QTextStream &t, bool bIncl
       err("ERROR - read error in %s before end of RTF header!\n",infName.data());
       return FALSE;
     }
-    if (bIncludeHeader) t << lineBuf;
+    if (bIncludeHeader) encodeForOutput(t,lineBuf);
   } while (lineBuf.find("\\comment begin body")==-1);
 
 
-  //while (fgets(buffer,sizeof(buffer),infp) != NULL)
   while (f.readLine(lineBuf.data(),maxLineLength)!=-1)
   {
     int pos;
@@ -2260,18 +2310,18 @@ static bool PreProcessFile(QDir &d,QCString &infName, QTextStream &t, bool bIncl
       int endNamePos    = lineBuf.find('"',startNamePos);
       QCString fileName = lineBuf.mid(startNamePos,endNamePos-startNamePos);
       DBG_RTF(t << "{\\comment begin include " << fileName << "}" << endl)
-      if (!PreProcessFile(d,fileName,t,FALSE)) return FALSE;
+      if (!preProcessFile(d,fileName,t,FALSE)) return FALSE;
       DBG_RTF(t << "{\\comment end include " << fileName << "}" << endl)
     }
-    else
+    else // no INCLUDETEXT on this line
     {
       // elaborate hoopla to skip  the final "}" if we didn't include the
       // headers
       if (!f.atEnd() || bIncludeHeader)
       {
-        t << lineBuf;
+        encodeForOutput(t,lineBuf);
       }
-      else
+      else // last line of included file
       {
         // null terminate at the last '}'
         //char *str = strrchr(buffer,'}');
@@ -2281,7 +2331,7 @@ static bool PreProcessFile(QDir &d,QCString &infName, QTextStream &t, bool bIncl
           lineBuf.at(pos) = '\0';
         else
           err("Strange, the last char was not a '}'\n");
-        t << lineBuf;
+        encodeForOutput(t,lineBuf);
       }
     }
   }
@@ -2301,7 +2351,7 @@ void RTFGenerator::endDotGraph(const DotClassGraph &g)
   newParagraph();
 
   QCString fileName =
-    g.writeGraph(t,BITMAP,Config_getString("RTF_OUTPUT"),relPath,TRUE,FALSE);
+    g.writeGraph(t,BITMAP,Config_getString("RTF_OUTPUT"),fileName,relPath,TRUE,FALSE);
 
   // display the file
   t << "{" << endl;
@@ -2323,14 +2373,14 @@ void RTFGenerator::endInclDepGraph(const DotInclDepGraph &g)
 {
   newParagraph();
 
-  QCString fileName = g.writeGraph(t,BITMAP,Config_getString("RTF_OUTPUT"),
-                         relPath,FALSE);
+  QCString fn = g.writeGraph(t,BITMAP,Config_getString("RTF_OUTPUT"),
+                         fileName,relPath,FALSE);
 
   // display the file
   t << "{" << endl;
   t << rtf_Style_Reset << endl;
   t << "\\par\\pard \\qc {\\field\\flddirty {\\*\\fldinst INCLUDEPICTURE \"";
-  t << fileName << "." << Config_getEnum("DOT_IMAGE_FORMAT");
+  t << fn << "." << Config_getEnum("DOT_IMAGE_FORMAT");
   t << "\" \\\\d \\\\*MERGEFORMAT}{\\fldrslt IMAGE}}\\par" << endl;
   t << "}" << endl;
   DBG_RTF(t << "{\\comment (endInclDepGraph)}"    << endl)
@@ -2353,14 +2403,14 @@ void RTFGenerator::endCallGraph(const DotCallGraph &g)
 {
   newParagraph();
 
-  QCString fileName = g.writeGraph(t,BITMAP,Config_getString("RTF_OUTPUT"),
-                        relPath,FALSE);
+  QCString fn = g.writeGraph(t,BITMAP,Config_getString("RTF_OUTPUT"),
+                        fileName,relPath,FALSE);
 
   // display the file
   t << "{" << endl;
   t << rtf_Style_Reset << endl;
   t << "\\par\\pard \\qc {\\field\\flddirty {\\*\\fldinst INCLUDEPICTURE \"";
-  t << fileName << "." << Config_getEnum("DOT_IMAGE_FORMAT");
+  t << fn << "." << Config_getEnum("DOT_IMAGE_FORMAT");
   t << "\" \\\\d \\\\*MERGEFORMAT}{\\fldrslt IMAGE}}\\par" << endl;
   t << "}" << endl;
   DBG_RTF(t << "{\\comment (endCallGraph)}"    << endl)
@@ -2376,7 +2426,7 @@ void RTFGenerator::endDirDepGraph(const DotDirDeps &g)
   newParagraph();
 
   QCString fileName = g.writeGraph(t,BITMAP,Config_getString("RTF_OUTPUT"),
-                        relPath,FALSE);
+                        fileName,relPath,FALSE);
 
   // display the file
   t << "{" << endl;
@@ -2460,10 +2510,9 @@ bool RTFGenerator::preProcessFileInplace(const char *path,const char *name)
     err("Failed to open %s for writing!\n",combinedName.data());
     return FALSE;
   }
-  QTextStream outt(&outf);
-  outt.setEncoding(QTextStream::UnicodeUTF8);
+  FTextStream outt(&outf);
 
-  if (!PreProcessFile(thisDir,mainRTFName,outt))
+  if (!preProcessFile(thisDir,mainRTFName,outt))
   {
     // it failed, remove the temp file
     outf.close();
@@ -2582,7 +2631,7 @@ void RTFGenerator::endParamList()
 void RTFGenerator::startParameterType(bool first,const char *key)
 {
   DBG_RTF(t << "{\\comment (startParameterList)}"    << endl)
-  if (!first)
+  if (!first && key)
   {
     t << " " << key << " ";
   }
@@ -2620,6 +2669,7 @@ void RTFGenerator::rtfwriteRuler_thin()
   t << "{\\pard\\widctlpar\\brdrb\\brdrs\\brdrw5\\brsp20 \\adjustright \\par}" << endl; 
 }
 
+#if 0
 void RTFGenerator::postProcess(QByteArray &a)
 {
   QByteArray enc(a.size()*4); // worst case
@@ -2648,6 +2698,7 @@ void RTFGenerator::postProcess(QByteArray &a)
   enc.resize(off);
   a = enc;
 }
+#endif
 
 void RTFGenerator::startConstraintList(const char *header)
 {

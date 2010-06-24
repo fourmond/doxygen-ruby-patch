@@ -131,7 +131,7 @@ static void setFileName(const char *name)
   //printf("setFileName(%s) g_yyFileName=%s g_yyFileDef=%p\n",
   //    name,g_yyFileName.data(),g_yyFileDef);
   if (g_yyFileDef && g_yyFileDef->isReference()) g_yyFileDef=0;
-  g_insideCS = g_yyFileName.right(3)==".cs";
+  g_insideCS = getLanguageFromFileName(g_yyFileName)==SrcLangExt_CSharp;
 }
 
 static void incrLevel()
@@ -1365,6 +1365,7 @@ CHARLIT   (("'"\\[0-7]{1,3}"'")|("'"\\."'")|("'"[^'\\\n]{1,4}"'"))
 %x	Command
 %x	SkipCommand
 %x	SkipLine
+%x	SkipString
 %x	CopyLine
 %x	CopyString
 %x      Include
@@ -1500,7 +1501,7 @@ CHARLIT   (("'"\\[0-7]{1,3}"'")|("'"\\."'")|("'"[^'\\\n]{1,4}"'"))
 					  if ((g_includeStack.isEmpty() || g_curlyCount>0) &&
 					      g_macroExpansion &&
 					      (def=g_fileDefineDict->find(yytext)) &&
-				              macroIsAccessible(def) &&
+				              (def->isPredefined || macroIsAccessible(def)) &&
 					      (!g_expandOnlyPredef || def->isPredefined)
 					     )
 					  {
@@ -1509,7 +1510,7 @@ CHARLIT   (("'"\\[0-7]{1,3}"'")|("'"\\."'")|("'"[^'\\\n]{1,4}"'"))
 					    g_defArgsStr=yytext;
 					    if (def->nargs==-1) // no function macro
 					    {
-					      QCString result = expandMacro(g_defArgsStr);
+					      QCString result = def->isPredefined ? def->definition : expandMacro(g_defArgsStr);
 					      outputArray(result,result.length());
 					    }
 					    else // zero or more arguments
@@ -1525,19 +1526,15 @@ CHARLIT   (("'"\\[0-7]{1,3}"'")|("'"\\."'")|("'"[^'\\\n]{1,4}"'"))
   					}
 <CopyLine>{ID}				{
                                           Define *def=0;
-					  //printf("Search for define %s\n",yytext);
   					  if ((g_includeStack.isEmpty() || g_curlyCount>0) && 
 					      g_macroExpansion &&
 					      (def=g_fileDefineDict->find(yytext)) &&
 					      def->nargs==-1 &&
-				              macroIsAccessible(def) &&
+				              (def->isPredefined || macroIsAccessible(def)) &&
 					      (!g_expandOnlyPredef || def->isPredefined)
 					     )
 					  {
-					    //printf("Found it!\n");
-                                            QCString name=yytext;
-					    QCString result=expandMacro(name); 
-					    //printf("result=`%s'\n",result.data());
+					    QCString result=def->isPredefined ? def->definition : expandMacro(yytext); 
 					    outputArray(result,result.length());
 					  }
 					  else
@@ -1826,13 +1823,17 @@ CHARLIT   (("'"\\[0-7]{1,3}"'")|("'"\\."'")|("'"[^'\\\n]{1,4}"'"))
   					  BEGIN(SkipLine); 
 					}
 <SkipCommand>.
-<SkipLine>[^/\n]+			
+<SkipLine>[^'"/\n]+			
+<SkipLine>{CHARLIT}			{ }
+<SkipLine>\"				{
+					  BEGIN(SkipString);
+					}
 <SkipLine>.
-<SkipLine,SkipCommand,SkipCPPBlock>"//"[^\n]* {
+<SkipLine,SkipCommand,SkipCPPBlock,SkipString>"//"[^\n]* {
   					  g_lastCPPContext=YY_START;
   					  BEGIN(RemoveCPPComment);
 					}
-<SkipLine,SkipCommand,SkipCPPBlock>"/*"/[^\n]* {
+<SkipLine,SkipCommand,SkipCPPBlock,SkipString>"/*"/[^\n]* {
 					  g_lastCContext=YY_START;
   					  BEGIN(RemoveCComment);
   					}
@@ -1841,6 +1842,12 @@ CHARLIT   (("'"\\[0-7]{1,3}"'")|("'"\\."'")|("'"[^'\\\n]{1,4}"'"))
 					  g_yyLineNr++;  
 					  BEGIN(SkipCPPBlock);
 					}
+<SkipString>[^"\\\n]+			{ }
+<SkipString>\\.				{ }
+<SkipString>\"				{
+  					  BEGIN(SkipLine);
+  					}
+<SkipString>.				{ }
 <IncludeID>{ID}{B}*/"("			{
   					  g_nospaces=TRUE;
 				          g_roundCount=0;
@@ -2108,6 +2115,16 @@ CHARLIT   (("'"\\[0-7]{1,3}"'")|("'"\\."'")|("'"[^'\\\n]{1,4}"'"))
 					  g_defLitText+=yytext;
 					  g_defText+=' ';
   					}
+<RemoveCComment>"*/"{B}*"#"	        { // see bug 594021 for a usecase for this rule
+                                          if (g_lastCContext==SkipCPPBlock)
+					  {
+					    BEGIN(SkipCommand);
+					  }
+					  else
+					  {
+					    REJECT;
+					  }
+					}
 <RemoveCComment>"*/"		        { BEGIN(g_lastCContext); }
 <RemoveCComment>"//"			
 <RemoveCComment>"/*"

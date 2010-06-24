@@ -27,7 +27,7 @@
 static const int maxCmdLine = 40960;
 
 static bool convertMapFile(QTextStream &t,const char *mapName,const QCString relPath,
-                           const QString &context)
+                           const QCString &context)
 {
   QFile f(mapName);
   if (!f.open(IO_ReadOnly))
@@ -68,13 +68,9 @@ static bool convertMapFile(QTextStream &t,const char *mapName,const QCString rel
       if ( isRef )
       {
         // handle doxygen \ref tag URL reference
-        QCString *dest;
         DocRef *df = new DocRef( (DocNode*) 0, url, context );
-        if (!df->ref().isEmpty())
-        {
-          if ((dest=Doxygen::tagDestinationDict[df->ref()])) t << *dest << "/";
-        }
-        if (!df->file().isEmpty()) t << relPath << df->file() << Doxygen::htmlFileExtension;
+        t << externalRef(relPath,df->ref(),TRUE);
+        if (!df->file().isEmpty()) t << df->file() << Doxygen::htmlFileExtension;
         if (!df->anchor().isEmpty()) t << "#" << df->anchor();
       }
       else
@@ -121,29 +117,34 @@ void writeMscGraphFromFile(const char *inFile,const char *outDir,
   mscArgs+=extension+"\"";
   int exitCode;
   //printf("*** running: %s %s\n",mscExe.data(),mscArgs.data());
+  portable_sysTimerStart();
   if ((exitCode=portable_system(mscExe,mscArgs,FALSE))!=0)
   {
+    portable_sysTimerStop();
     goto error;
   }
+  portable_sysTimerStop();
   if ( (format==MSC_EPS) && (Config_getBool("USE_PDFLATEX")) )
   {
     QCString epstopdfArgs(maxCmdLine);
     epstopdfArgs.sprintf("\"%s.eps\" --outfile=\"%s.pdf\"",
                          outFile,outFile);
+    portable_sysTimerStart();
     if (portable_system("epstopdf",epstopdfArgs)!=0)
     {
       err("Error: Problems running epstopdf. Check your TeX installation!\n");
     }
+    portable_sysTimerStop();
   }
 
 error:
   QDir::setCurrent(oldDir);
 }
 
-QString getMscImageMapFromFile(const QString& inFile, const QString& outDir,
-                               const QCString& relPath,const QString& context)
+QCString getMscImageMapFromFile(const QCString& inFile, const QCString& outDir,
+                                const QCString& relPath,const QCString& context)
 {
-  QString outFile = inFile + ".map";
+  QCString outFile = inFile + ".map";
 
   // chdir to the output dir, so dot can find the font file.
   QCString oldDir = convertToQCString(QDir::currentDirPath());
@@ -157,11 +158,14 @@ QString getMscImageMapFromFile(const QString& inFile, const QString& outDir,
   mscArgs+=outFile + "\"";
 
   int exitCode;
+  portable_sysTimerStart();
   if ((exitCode=portable_system(mscExe,mscArgs,FALSE))!=0)
   {
+    portable_sysTimerStop();
     QDir::setCurrent(oldDir);
     return "";
   }
+  portable_sysTimerStop();
   
   QString result;
   QTextOStream tmpout(&result);
@@ -169,7 +173,7 @@ QString getMscImageMapFromFile(const QString& inFile, const QString& outDir,
   QDir().remove(outFile);
 
   QDir::setCurrent(oldDir);
-  return result;
+  return result.data();
 }
 
 

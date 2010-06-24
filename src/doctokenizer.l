@@ -16,6 +16,7 @@
  *
  */
 
+
 %{
 
 #include <qfile.h>
@@ -42,7 +43,7 @@ static int g_commentState;
 TokenInfo *g_token = 0;
 static int g_inputPos = 0;
 static const char *g_inputString;
-static QString g_fileName;
+static QCString g_fileName;
 static bool g_insidePre;
 
 // context for section finding phase
@@ -181,7 +182,7 @@ static void handleHtmlTag()
 
   // Parse the name portion
   int i = startNamePos;
-  for (i=startNamePos; i < yyleng; i++)
+  for (i=startNamePos; i < (int)yyleng; i++)
   {
     // Check for valid HTML/XML name chars (including namespaces)
     char c = tagText.at(i);
@@ -192,11 +193,11 @@ static void handleHtmlTag()
   // Parse the attributes. Each attribute is a name, value pair
   // The result is stored in g_token->attribs.
   int startName,endName,startAttrib,endAttrib;
-  while (i<yyleng)
+  while (i<(int)yyleng)
   {
     char c=tagText.at(i);
     // skip spaces
-    while (i<yyleng && isspace(c)) { c=tagText.at(++i); }
+    while (i<(int)yyleng && isspace(c)) { c=tagText.at(++i); }
     // check for end of the tag
     if (c == '>') break;
     // Check for XML style "empty" tag.
@@ -207,43 +208,43 @@ static void handleHtmlTag()
     }
     startName=i;
     // search for end of name
-    while (i<yyleng && !isspace(c) && c!='=') { c=tagText.at(++i); }
+    while (i<(int)yyleng && !isspace(c) && c!='=') { c=tagText.at(++i); }
     endName=i;
     HtmlAttrib opt;
     opt.name  = tagText.mid(startName,endName-startName).lower(); 
     // skip spaces
-    while (i<yyleng && isspace(c)) { c=tagText.at(++i); } 
+    while (i<(int)yyleng && isspace(c)) { c=tagText.at(++i); } 
     if (tagText.at(i)=='=') // option has value
     {
       c=tagText.at(++i);
       // skip spaces
-      while (i<yyleng && isspace(c)) { c=tagText.at(++i); } 
+      while (i<(int)yyleng && isspace(c)) { c=tagText.at(++i); } 
       if (tagText.at(i)=='\'') // option '...'
       {
         c=tagText.at(++i);
 	startAttrib=i;
 	
 	// search for matching quote 
-        while (i<yyleng && c!='\'') { c=tagText.at(++i); } 
+        while (i<(int)yyleng && c!='\'') { c=tagText.at(++i); } 
 	endAttrib=i;
-        if (i<yyleng) c=tagText.at(++i);
+        if (i<(int)yyleng) c=tagText.at(++i);
       }
       else if (tagText.at(i)=='"') // option "..."
       {
         c=tagText.at(++i);
 	startAttrib=i;
 	// search for matching quote 
-        while (i<yyleng && c!='"') { c=tagText.at(++i); } 
+        while (i<(int)yyleng && c!='"') { c=tagText.at(++i); } 
 	endAttrib=i;
-        if (i<yyleng) c=tagText.at(++i);
+        if (i<(int)yyleng) c=tagText.at(++i);
       }
       else // value without any quotes
       {
 	startAttrib=i;
 	// search for separator or end symbol
-        while (i<yyleng && !isspace(c) && c!='>') { c=tagText.at(++i); } 
+        while (i<(int)yyleng && !isspace(c) && c!='>') { c=tagText.at(++i); } 
 	endAttrib=i;
-	if (i<yyleng) c=tagText.at(++i);
+	if (i<(int)yyleng) c=tagText.at(++i);
       }
       opt.value  = tagText.mid(startAttrib,endAttrib-startAttrib); 
     }
@@ -256,7 +257,7 @@ static void handleHtmlTag()
   }
 }
   
-static QString stripEmptyLines(const char *s)
+static QCString stripEmptyLines(const char *s)
 {
   int result=0,p=0;
   for (;;)
@@ -382,14 +383,14 @@ REFWORD   {LABELID}|{REFWORD2}
 %%
 <St_Para>\r               /* skip carriage return */
 <St_Para>^{LISTITEM}      { /* list item */ 
-                         QString text=yytext;
+                         QCString text=yytext;
 			 int dashPos = text.findRev('-');
 			 g_token->isEnumList = text.at(dashPos+1)=='#';
 			 g_token->indent     = computeIndent(yytext,dashPos);
                          return TK_LISTITEM;
                        }
 <St_Para>{BLANK}*\n{LISTITEM}     { /* list item on next line */ 
-                         QString text=yytext;
+                         QCString text=yytext;
 			 text=text.right(text.length()-text.find('\n')-1);
 			 int dashPos = text.findRev('-');
 			 g_token->isEnumList = text.at(dashPos+1)=='#';
@@ -397,12 +398,12 @@ REFWORD   {LABELID}|{REFWORD2}
                          return TK_LISTITEM;
                        }
 <St_Para>^{ENDLIST}       { /* end list */ 
-                         int dotPos = QString(yytext).findRev('.');
+                         int dotPos = QCString(yytext).findRev('.');
 			 g_token->indent     = computeIndent(yytext,dotPos);
                          return TK_ENDLIST;
                        }
 <St_Para>{BLANK}*\n{ENDLIST}      { /* end list on next line */ 
-                         QString text=yytext;
+                         QCString text=yytext;
 			 text=text.right(text.length()-text.find('\n')-1);
                          int dotPos = text.findRev('.');
 			 g_token->indent     = computeIndent(text,dotPos);
@@ -422,7 +423,7 @@ REFWORD   {LABELID}|{REFWORD2}
 <St_Para>{SPCMD3}      {
   			 g_token->name = "form";
 			 bool ok;
-			 g_token->id = QString(yytext).right(yyleng-6).toInt(&ok);
+			 g_token->id = QCString(yytext).right(yyleng-6).toInt(&ok);
 			 ASSERT(ok);
 			 return TK_COMMAND;
   		       }
@@ -435,7 +436,7 @@ REFWORD   {LABELID}|{REFWORD2}
   		       }
 <St_Para>{PARAMIO}     { /* param [in,out] command */
   			 g_token->name = "param";
-			 QString s(yytext);
+			 QCString s(yytext);
 			 bool isIn  = s.find("in")!=-1;
 			 bool isOut = s.find("out")!=-1;
 			 if (isIn)
@@ -470,7 +471,7 @@ REFWORD   {LABELID}|{REFWORD2}
 			 return TK_URL;
                        }
 <St_Para>"$"{ID}":"[^\n$]+"$" { /* RCS tag */
-                         QString tagName(yytext+1);
+                         QCString tagName(yytext+1);
 			 int index=tagName.find(':');
   			 g_token->name = tagName.left(index+1);
 			 g_token->text = tagName.mid(index+2,tagName.length()-index-3);
@@ -774,7 +775,7 @@ REFWORD   {LABELID}|{REFWORD2}
                          BEGIN(St_XRefItem2);
                        }
 <St_XRefItem2>[0-9]+"." {
-  			 QString numStr=yytext;
+  			 QCString numStr=yytext;
 			 numStr=numStr.left(yyleng-1);
 			 g_token->id=numStr.toInt();
 			 return RetVal_OK;
@@ -802,7 +803,7 @@ REFWORD   {LABELID}|{REFWORD2}
 			 return TK_WORD;  
   		       }
 <St_File>"\""[^\n\"]+"\"" {
-  		         QString text=yytext;
+  		         QCString text=yytext;
 			 g_token->name = text.mid(1,text.length()-2);
 			 return TK_WORD;
   		       }

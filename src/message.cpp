@@ -22,6 +22,7 @@
 #include "util.h"
 #include "debug.h"
 #include "doxygen.h"
+#include "portable.h"
 
 static QCString outputFormat;
 //static int warnFormatOrder; // 1 = $file,$line,$text
@@ -88,7 +89,7 @@ void initWarningFormat()
 
   if (!Config_getString("WARN_LOGFILE").isEmpty())
   {
-    warnFile = fopen(Config_getString("WARN_LOGFILE"),"w");
+    warnFile = portable_fopen(Config_getString("WARN_LOGFILE"),"w");
   }
   if (!warnFile) // point it to something valid, because warn() relies on it
   {
@@ -161,16 +162,6 @@ void warn(const char *file,int line,const char *fmt, ...)
   va_end(args); 
 }
 
-void warn_cont(const char *fmt, ...)
-{
-  if (!Config_getBool("WARNINGS"))
-    return;
-  va_list args;
-  va_start(args, fmt);
-  vfprintf(warnFile, fmt, args);
-  va_end(args); 
-}
-  
 void warn_undoc(const char *file,int line,const char *fmt, ...)
 {
   va_list args;
