@@ -39,7 +39,7 @@ public:
 		  const char *fileBuf, 
 		  Entry *root);
   bool needsPreprocessing(const QCString &extension);
-  void parseCode(CodeOutputInterface &codeOutIntf,
+  virtual void parseCode(CodeOutputInterface &codeOutIntf,
 		 const char *scopeName,
 		 const QCString &input,
 		 bool isExampleBlock,
@@ -48,7 +48,8 @@ public:
 		 int startLine=-1,
 		 int endLine=-1,
 		 bool inlineFragment=FALSE,
-		 MemberDef *memberDef=0
+		 MemberDef *memberDef=0, 
+		 bool showLineNumbers=TRUE
 		 );
   void resetCodeParserState();
   void parsePrototype(const char *text);

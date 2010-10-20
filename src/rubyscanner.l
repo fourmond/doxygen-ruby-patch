@@ -242,7 +242,6 @@ static void initEntry()
   current->mtype      = mtype;
   current->virt       = virt;
   current->stat       = gstat;
-  current->objc       = FALSE; //insideObjC;
   current->setParent(current_root);
   initGroupInfo(current);
 }
@@ -334,16 +333,15 @@ static void assignConstant()
 
 /// Parses the string s and returns all the substrings matching the
 /// pattern.
-static QValueList<QCString> extractPatterns(QCString s, 
+static QValueList<QCString> extractPatterns(const QCString &str, 
 					    const char * pattern)
 {
-  QString str = s;
   int idx,len;
   QRegExp re(pattern);
   QValueList<QCString> values;
   idx = 0;
   while((idx = re.match(str, idx, &len))>=0) {
-    QCString val = str.mid(idx, len).local8Bit();
+    QCString val = str.mid(idx, len);
     values.append(val);
     idx+=len;
   }
@@ -475,7 +473,6 @@ static void doAlias()
     current->bodyLine  = yyLineNr;
     current->section = Entry::FUNCTION_SEC;
     current->protection = protection;
-    current->objc = FALSE;
     current->virt = Normal;
     current->stat = FALSE;
     current->mtype = mtype = Method;
@@ -613,9 +610,9 @@ static QCString replaceInString(const char * regex, const QCString &str,
 				int la, const char * after)
 {
   QRegExp re(regex);
-  QString s = str;
-  QString b = before;
-  QString a = after;
+  QCString s = str;
+  QCString b = before;
+  QCString a = after;
   int index = 0;
   int len = 0;
   while(index = re.match(s,index,&len, index == 0),index >= 0) {
@@ -921,7 +918,6 @@ HEREDOC           <<-?['"]?({LETTER}|{DIGIT}|"_")+['"]?
 			  current->bodyLine  = yyLineNr;
 			  current->section = Entry::FUNCTION_SEC;
 			  current->protection = protection;
-			  current->objc = FALSE;
 			  current->virt = Normal;
 			  current->stat = FALSE;
 			  current->mtype = mtype = Method;
@@ -1619,7 +1615,8 @@ void RubyLanguageScanner::parseCode(CodeOutputInterface &codeOutIntf,
     int startLine,
     int endLine,
     bool inlineFragment,
-    MemberDef *memberDef
+    MemberDef *memberDef,
+    bool showLineNumbers
     )
 {
   ::parseRubyCode(codeOutIntf,scopeName,input,isExampleBlock,exampleName,
