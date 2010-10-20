@@ -279,6 +279,7 @@ void DocSets::addIndexItem(Definition *context,MemberDef *md,const char *)
     case SrcLangExt_F90:     lang="fortran"; break;    // Fortran
     case SrcLangExt_VHDL:    lang="vhdl"; break;       // VHDL
     case SrcLangExt_XML:     lang="xml"; break;        // DBUS XML
+    case SrcLangExt_Ruby:    lang="ruby"; break;        // DBUS XML
     case SrcLangExt_Unknown: lang="unknown"; break;   // should not happen!
   }
 

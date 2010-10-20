@@ -101,7 +101,8 @@ enum SrcLangExt
   SrcLangExt_Python  = 0x0800,
   SrcLangExt_F90     = 0x1000,
   SrcLangExt_VHDL    = 0x2000,
-  SrcLangExt_XML     = 0x4000
+  SrcLangExt_XML     = 0x4000,
+  SrcLangExt_Ruby    = 0x8000
 };
 
 //--------------------------------------------------------------------
