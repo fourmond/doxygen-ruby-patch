@@ -20,9 +20,9 @@
 #define DOXYGEN_H
 
 #include "qtbc.h"
-#include <qtextstream.h>
 #include <qdatetime.h>
 #include <qcache.h>
+#include "ftextstream.h"
 #include "groupdef.h"
 #include "filedef.h"
 #include "classdef.h"
@@ -92,10 +92,11 @@ class Doxygen
     static FileNameList             *inputNameList;
     static FileNameDict             *imageNameDict;
     static FileNameDict             *dotFileNameDict;
+    static FileNameDict             *mscFileNameDict;
     static QStrList                  tagfileList;
     static MemberNameSDict          *memberNameSDict;
     static MemberNameSDict          *functionNameSDict;
-    static QTextStream               tagFile;
+    static FTextStream               tagFile;
     static SectionDict               sectionDict;
     static StringDict                namespaceAliasDict;
     static GroupSDict               *groupSDict;

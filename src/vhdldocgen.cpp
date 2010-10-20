@@ -294,7 +294,7 @@ MemberDef* VhdlDocGen::findMember(const QCString& className, const QCString& mem
       tt=tt.upper();
       ecd =getClass(tt);
     }
-    else if (!ecd)
+    if (!ecd)
     {
       tt=tt.lower();
       ecd =getClass(tt);  
@@ -622,7 +622,7 @@ void VhdlDocGen::addFuncDoc(EntryNav* rootNav)
     if (!func && Config_getBool("WARNINGS"))
     {
       warn(root->fileName,root->docLine,
-      "Warning: documentation for unknown function %s found.\n",
+      "warning: documentation for unknown function %s found.\n",
       root->name.data()
       );
     }

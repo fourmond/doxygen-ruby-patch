@@ -291,7 +291,8 @@ CMD   ("\\"|"@")
 WS    [ \t\r\n]
 NONWS [^ \t\r\n]
 BLANK [ \t\r]
-ID    "$"?[a-z_A-Z][a-z_A-Z0-9]*
+ID       "$"?[a-z_A-Z\x80-\xFF][a-z_A-Z0-9\x80-\xFF]*
+LABELID  [a-z_A-Z\x80-\xFF][a-z_A-Z0-9\x80-\xFF\-]*
 MAILADR  [a-z_A-Z0-9.+-]+"@"[a-z_A-Z0-9-]+("."[a-z_A-Z0-9\-]+)+[a-z_A-Z0-9\-]+
 OPTSTARS ("//"{BLANK}*)?"*"*{BLANK}*
 LISTITEM {BLANK}*{OPTSTARS}"-"("#")?{WS}
@@ -305,13 +306,13 @@ HFILEMASK ("."{FILESCHAR}*{FILEECHAR}+)*
 FILEMASK  ({FILESCHAR}*{FILEECHAR}+("."{FILESCHAR}*{FILEECHAR}+)*)|{HFILEMASK}
 LINKMASK  [^ \t\n\r\\@<&${}]+("("[^\n)]*")")?({BLANK}*("const"|"volatile"){BLANK}+)? 
 VERBATIM  "verbatim"{BLANK}*
-SPCMD1    {CMD}([a-z_A-Z0-9]+|{VERBATIM})
+SPCMD1    {CMD}([a-z_A-Z][a-z_A-Z0-9]*|{VERBATIM})
 SPCMD2    {CMD}[\\@<>&$#%~"]
 SPCMD3    {CMD}form#[0-9]+
 INOUT	  "in"|"out"|("in"{BLANK}*","{BLANK}*"out")|("out"{BLANK}*","{BLANK}*"in")
 PARAMIO   {CMD}param{BLANK}*"["{BLANK}*{INOUT}{BLANK}*"]"
 TEMPCHAR  [a-z_A-Z0-9,: \t\*\&]
-FUNCCHAR  [a-z_A-Z0-9,:\<\> \t\*\&]
+FUNCCHAR  [a-z_A-Z0-9,:\<\> \t\*\&\[\]]
 SCOPESEP  "::"|"#"|"."
 TEMPLPART "<"{TEMPCHAR}*">"
 SCOPEPRE  {ID}{TEMPLPART}?{SCOPESEP}
@@ -339,7 +340,6 @@ HTMLTAG   "<"(("/")?){ID}({WS}+{ATTRIB})*{WS}*(("/")?)">"
 HTMLKEYL  "strong"|"center"|"table"|"caption"|"small"|"code"|"dfn"|"var"|"img"|"pre"|"sub"|"sup"|"tr"|"td"|"th"|"ol"|"ul"|"li"|"tt"|"kbd"|"em"|"hr"|"dl"|"dt"|"dd"|"br"|"i"|"a"|"b"|"p"
 HTMLKEYU  "STRONG"|"CENTER"|"TABLE"|"CAPTION"|"SMALL"|"CODE"|"DFN"|"VAR"|"IMG"|"PRE"|"SUB"|"SUP"|"TR"|"TD"|"TH"|"OL"|"UL"|"LI"|"TT"|"KBD"|"EM"|"HR"|"DL"|"DT"|"DD"|"BR"|"I"|"A"|"B"|"P"
 HTMLKEYW  {HTMLKEYL}|{HTMLKEYU}
-LABELID   [a-z_A-Z][a-z_A-Z0-9\-]*
 REFWORD2  ("#"|"::")?({ID}{TEMPLPART}?("."|"#"|"::"|"-"|"/"))*({ID}(":")?){FUNCARG}?
 REFWORD   {LABELID}|{REFWORD2}
 
@@ -768,7 +768,7 @@ REFWORD   {LABELID}|{REFWORD2}
 <St_Ref2>"\""|\n       { /* " or \n => end of title */
   			 return 0;
                        }
-<St_XRefItem>{ID}   {
+<St_XRefItem>{LABELID} {
                          g_token->name=yytext;
                        }
 <St_XRefItem>" "       {
@@ -789,6 +789,15 @@ REFWORD   {LABELID}|{REFWORD2}
 			 g_token->name = g_token->name.left(yyleng-2);
 			 return TK_WORD;
                        }
+<St_Param>({LABELID}"|")*{LABELID}{WS}+("&")?"$"{LABELID} {
+  			 QCString params = yytext;
+			 int j = params.find('&');
+			 int i = params.find('$');
+			 if (j<i && j!=-1) i=j;
+			 QCString types = params.left(i).stripWhiteSpace();
+			 g_token->name = types+"#"+params.mid(i);
+			 return TK_WORD;
+  		       }
 <St_Param>[^ \t\n,]+   {
   			 g_token->name = yytext;
 			 return TK_WORD;
@@ -919,20 +928,20 @@ REFWORD   {LABELID}|{REFWORD2}
                          BEGIN(St_Sections);
 		       }
 <St_SecTitle,St_SecLabel1,St_SecLabel2>. {
-                         warn(g_fileName,yylineno,"Error: Unexpected character `%s' while looking for section label or title",yytext); 
+                         warn(g_fileName,yylineno,"warning: Unexpected character `%s' while looking for section label or title",yytext); 
                        }
    
      /* Generic rules that work for all states */ 
 <*>\n                  { 
-                         warn(g_fileName,yylineno,"Error: Unexpected new line character"); 
+                         warn(g_fileName,yylineno,"warning: Unexpected new line character"); 
 		       }
 <*>[\\@<>&$#%~"]       { /* unescaped special character */
-                         //warn(g_fileName,yylineno,"Warning: Unexpected character `%s', assuming command \\%s was meant.",yytext,yytext); 
+                         //warn(g_fileName,yylineno,"warning: Unexpected character `%s', assuming command \\%s was meant.",yytext,yytext); 
 			 g_token->name = yytext;
 			 return TK_COMMAND;
                        }
 <*>.                   { 
-                         warn(g_fileName,yylineno,"Error: Unexpected character `%s'",yytext); 
+                         warn(g_fileName,yylineno,"warning: Unexpected character `%s'",yytext); 
 		       }
 %%
 

@@ -22,9 +22,9 @@
 #define HTMLHELP_H
 
 #include "qtbc.h"
-#include <qtextstream.h>
 #include <qstrlist.h>
 #include "index.h"
+#include "ftextstream.h"
 
 class QFile;
 class HtmlHelpIndex;
@@ -77,8 +77,7 @@ class HtmlHelp  : public IndexIntf
     //void addIndexItem(const char *level1, const char *level2, 
     //                  const char *contRef, const char *memRef,
     //                  const char *anchor,const MemberDef *md);
-    void addIndexItem(Definition *context,MemberDef *md,
-                      const char *anchor,const char *word);
+    void addIndexItem(Definition *context,MemberDef *md,const char *title);
     void addIndexFile(const char *name);
     void addImageFile(const char *) {}
     void addStyleSheetFile(const char *) {}
@@ -87,7 +86,7 @@ class HtmlHelp  : public IndexIntf
     void createProjectFile();
 
     QFile *cf,*kf; 
-    QTextStream cts,kts;
+    FTextStream cts,kts;
     HtmlHelpIndex *index;
     int dc;
     QStrList indexFiles;

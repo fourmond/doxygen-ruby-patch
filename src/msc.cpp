@@ -32,7 +32,7 @@ static bool convertMapFile(QTextStream &t,const char *mapName,const QCString rel
   QFile f(mapName);
   if (!f.open(IO_ReadOnly))
   {
-    err("Error opening map file %s for inclusion in the docs!\n"
+    err("error: failed to open map file %s for inclusion in the docs!\n"
         "If you installed Graphviz/dot after a previous failing run, \n"
         "try deleting the output directory and rerun doxygen.\n",mapName);
     return FALSE;
@@ -112,11 +112,17 @@ void writeMscGraphFromFile(const char *inFile,const char *outDir,
   }
   mscArgs+=" -i \"";
   mscArgs+=inFile;
-  mscArgs+=".msc\" -o \"";
+ 
+  if (QCString(inFile).right(4)!=".msc") // add extension if not given
+  {
+    mscArgs+=".msc";
+  }
+  mscArgs+="\" -o \"";
+
   mscArgs+=outFile;
   mscArgs+=extension+"\"";
   int exitCode;
-  //printf("*** running: %s %s\n",mscExe.data(),mscArgs.data());
+//  printf("*** running: %s %s outDir:%s %s\n",mscExe.data(),mscArgs.data(),outDir,outFile);
   portable_sysTimerStart();
   if ((exitCode=portable_system(mscExe,mscArgs,FALSE))!=0)
   {
@@ -132,7 +138,7 @@ void writeMscGraphFromFile(const char *inFile,const char *outDir,
     portable_sysTimerStart();
     if (portable_system("epstopdf",epstopdfArgs)!=0)
     {
-      err("Error: Problems running epstopdf. Check your TeX installation!\n");
+      err("error: Problems running epstopdf. Check your TeX installation!\n");
     }
     portable_sysTimerStop();
   }
@@ -146,6 +152,8 @@ QCString getMscImageMapFromFile(const QCString& inFile, const QCString& outDir,
 {
   QCString outFile = inFile + ".map";
 
+
+  //printf("*** running:getMscImageMapFromFile \n");
   // chdir to the output dir, so dot can find the font file.
   QCString oldDir = convertToQCString(QDir::currentDirPath());
   // go to the html output directory (i.e. path)
@@ -154,7 +162,12 @@ QCString getMscImageMapFromFile(const QCString& inFile, const QCString& outDir,
 
   QCString mscExe = Config_getString("MSCGEN_PATH")+"mscgen"+portable_commandExtension();
   QCString mscArgs = "-T ismap -i \"";
-  mscArgs+=inFile + ".msc\" -o \"";
+  mscArgs+=inFile;
+  if (QCString(inFile).right(4)!=".msc") // add extension if not given
+  {
+    mscArgs+=".msc";
+  }
+  mscArgs+="\" -o \"";
   mscArgs+=outFile + "\"";
 
   int exitCode;

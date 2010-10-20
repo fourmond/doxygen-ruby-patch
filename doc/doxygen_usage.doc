@@ -49,7 +49,7 @@ with the -u option.
 \verbatim
 doxygen -u <config_file>
 \endverbatim
-All configuration settings in the orginal configuration file will be copied
+All configuration settings in the original configuration file will be copied
 to the new configuration file. Any new options will have their default value.
 Note that comments that you may have added in the original configuration file 
 will be lost.
@@ -75,7 +75,7 @@ doxygen -w latex header.tex doxygen.sty
 \endverbatim
 If you need non-default options (for instance to use pdflatex) you need
 to make a config file with those options set correctly and then specify
-that config file as the forth argument. 
+that config file as the third argument. 
 <li>For RTF output, you can generate the default style sheet file (see
     \ref cfg_rtf_stylesheet_file "RTF_STYLESHEET_FILE") using:
 \verbatim

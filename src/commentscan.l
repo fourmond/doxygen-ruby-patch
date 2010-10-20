@@ -211,7 +211,7 @@ static DocCmdMap docCmdMap[] =
   { "copydetails",     0,                       TRUE  },
   { "date",            0,                       TRUE  },
   { "dotfile",         0,                       TRUE  },
-  { "htmlinclude",     0,                       TRUE  },
+  { "htmlinclude",     0,                       FALSE },
   { "image",           0,                       TRUE  },
   { "include",         0,                       TRUE  },
   { "includelineno",   0,                       TRUE  },
@@ -236,7 +236,7 @@ static DocCmdMap docCmdMap[] =
   { "throw",           0,                       TRUE  },
   { "throws",          0,                       TRUE  },
   { "until",           0,                       TRUE  },
-  { "verbinclude",     0,                       TRUE  },
+  { "verbinclude",     0,                       FALSE },
   { "version",         0,                       TRUE  },
   { "warning",         0,                       TRUE  },
   { 0, 0, FALSE }
@@ -433,6 +433,7 @@ static QCString getDocSectionName(int s)
     case Entry::CATEGORYDOC_SEC:    return "\\category";
     case Entry::ENUMDOC_SEC:        return "\\enum";
     case Entry::PAGEDOC_SEC:        return "\\page";
+    case Entry::VARIABLEDOC_SEC:    return "\\var";
     case Entry::MEMBERDOC_SEC:      return "\\fn";
     case Entry::OVERLOADDOC_SEC:    return "\\overload";
     case Entry::FILEDOC_SEC:        return "\\file";
@@ -451,6 +452,7 @@ static QCString getDocSectionName(int s)
 
 static bool makeStructuralIndicator(Entry::Sections s)
 {
+  //printf("current->section=%x\n",current->section);
   if (!getDocSectionName(current->section).isEmpty())
   {
     return TRUE;
@@ -718,6 +720,7 @@ static inline void setOutput(OutputContext ctx)
       else
       {
         pOutputString = &current->doc;
+	inContext = OutputDoc; // need to switch to detailed docs, see bug 631380
       }
       break;
     case OutputXRef:
@@ -930,6 +933,11 @@ RCSTAG    "$"{ID}":"[^\n$]+"$"
 <Comment>"<!--"				{ 
   					  BEGIN(HtmlComment);
 					}
+<Comment>{B}*{CMD}"endinternal"{B}*	{
+  					  warn(yyFileName,yyLineNr,
+                                               "warning: found \\endinternal without matching \\internal"
+                                              );
+  					}
 <Comment>{B}*{CMD}[a-z_A-Z]+{B}*	{ // potentially interesting command
                                           // the {B}* in the front was added for bug620924
   					  QCString cmdName = QCString(yytext).stripWhiteSpace().data()+1;
@@ -1031,7 +1039,7 @@ RCSTAG    "$"{ID}":"[^\n$]+"$"
 <Comment>^{B}*"."{B}*/\n                { // explicit end autolist: e.g "  ."
   				          addOutput(yytext); 
 					}
-<Comment>("."+)[a-z_A-Z0-9]		{ // . at start or in the middle of a word, or ellipsis
+<Comment>("."+)[a-z_A-Z0-9\)]		{ // . at start or in the middle of a word, or ellipsis
   					  addOutput(yytext);
   					}
 <Comment>".\\"[ \t]			{ // . with escaped space.
@@ -1098,18 +1106,18 @@ RCSTAG    "$"{ID}":"[^\n$]+"$"
  
 <ReadFormulaShort>{CMD}"f$"		{ // end of inline formula
   					  formulaText+="$";
-					  addOutput(addFormula());
+					  addOutput(" "+addFormula());
 					  BEGIN(Comment);
   					}
 <ReadFormulaLong>{CMD}"f]"		{ // end of block formula
 					  formulaText+="\\]";
-					  addOutput(addFormula());
+					  addOutput(" "+addFormula());
 					  BEGIN(Comment);
   					}
 <ReadFormulaLong>{CMD}"f}"		{ // end of custom env formula
 					  formulaText+="\\end";
 					  formulaText+=formulaEnv;
-					  addOutput(addFormula());
+					  addOutput(" "+addFormula());
 					  BEGIN(Comment);
   					}
 <ReadFormulaLong,ReadFormulaShort>[^\\@\n]+ { // any non-special character
@@ -1136,7 +1144,7 @@ RCSTAG    "$"{ID}":"[^\n$]+"$"
                                         }
 <EnumDocArg1>{DOCNL}			{ // missing argument
   					  warn(yyFileName,yyLineNr,
-                                               "Warning: missing argument after \\enum."
+                                               "warning: missing argument after \\enum."
                                               );
 					  addOutput('\n');
   					  if (*yytext=='\n') yyLineNr++;
@@ -1157,7 +1165,7 @@ RCSTAG    "$"{ID}":"[^\n$]+"$"
                                         }
 <NameSpaceDocArg1>{DOCNL}		{ // missing argument
   					  warn(yyFileName,yyLineNr,
-                                               "Warning: missing argument after "
+                                               "warning: missing argument after "
 					       "\\namespace."
                                               );
 					  addOutput('\n');
@@ -1179,7 +1187,7 @@ RCSTAG    "$"{ID}":"[^\n$]+"$"
                                         }
 <PackageDocArg1>{DOCNL}			{ // missing argument
   					  warn(yyFileName,yyLineNr,
-                                               "Warning: missing argument after "
+                                               "warning: missing argument after "
 					       "\\package."
                                               );
 					  addOutput('\n');
@@ -1210,7 +1218,7 @@ RCSTAG    "$"{ID}":"[^\n$]+"$"
                                         }
 <ClassDocArg1,CategoryDocArg1>{DOCNL}	{
   					  warn(yyFileName,yyLineNr,
-                                               "Warning: missing argument after "
+                                               "warning: missing argument after "
 					       "\\%s.",YY_START==ClassDocArg1?"class":"category"
                                               );
 					  addOutput('\n');
@@ -1253,7 +1261,7 @@ RCSTAG    "$"{ID}":"[^\n$]+"$"
 
   /* --------- handle arguments of {def,add,weak}group commands --------- */
 
-<GroupDocArg1>{ID}(".html"?)		{ // group name
+<GroupDocArg1>{LABELID}(".html"?)	{ // group name
   					  current->name = yytext;
 					  //lastDefGroup.groupname = yytext;
 					  //lastDefGroup.pri = current->groupingPri();
@@ -1271,7 +1279,7 @@ RCSTAG    "$"{ID}":"[^\n$]+"$"
                                         }
 <GroupDocArg1>{DOCNL}			{ // missing argument!
   					  warn(yyFileName,yyLineNr,
-                                               "Warning: missing group name after %s",
+                                               "warning: missing group name after %s",
 					       current->groupDocCmd()
                                               );
 					  addOutput('\n');
@@ -1292,7 +1300,7 @@ RCSTAG    "$"{ID}":"[^\n$]+"$"
 					     ) // defgroup requires second argument
 					  {
   					    warn(yyFileName,yyLineNr,
-                                                 "Warning: missing title after "
+                                                 "warning: missing title after "
 					         "\\defgroup %s", current->name.data()
                                                 );
 					  }
@@ -1312,7 +1320,7 @@ RCSTAG    "$"{ID}":"[^\n$]+"$"
                                         }
 <PageDocArg1>{DOCNL}			{
   					  warn(yyFileName,yyLineNr,
-                                               "Warning: missing argument after "
+                                               "warning: missing argument after "
 					       "\\page."
                                               );
   					  if (*yytext=='\n') yyLineNr++;
@@ -1347,7 +1355,7 @@ RCSTAG    "$"{ID}":"[^\n$]+"$"
 
   /* --------- handle arguments of the xrefitem command ------------ */
 
-<XRefItemParam1>{ID}			{ // first argument
+<XRefItemParam1>{LABELID}		{ // first argument
   					  newXRefItemKey=yytext;
                                           setOutput(OutputXRef);
 					  BEGIN(XRefItemParam2);
@@ -1358,7 +1366,7 @@ RCSTAG    "$"{ID}":"[^\n$]+"$"
                                         }
 <XRefItemParam1>{DOCNL}			{ // missing arguments
   					  warn(yyFileName,yyLineNr,
-					       "Warning: Missing first argument of \\xrefitem"
+					       "warning: Missing first argument of \\xrefitem"
 					      );
   					  if (*yytext=='\n') yyLineNr++;
 					  addOutput('\n');
@@ -1378,7 +1386,7 @@ RCSTAG    "$"{ID}":"[^\n$]+"$"
   					}
 <XRefItemParam2>{DOCNL}			{ // missing argument
   					  warn(yyFileName,yyLineNr,
-					      "Warning: Missing second argument of \\xrefitem"
+					      "warning: Missing second argument of \\xrefitem"
 					      );
   					  if (*yytext=='\n') yyLineNr++;
 					  addOutput('\n');
@@ -1399,7 +1407,7 @@ RCSTAG    "$"{ID}":"[^\n$]+"$"
   					}
 <XRefItemParam3>{DOCNL}			{ // missing argument
   					  warn(yyFileName,yyLineNr,
-					      "Warning: Missing third argument of \\xrefitem"
+					      "warning: Missing third argument of \\xrefitem"
 					      );
   					  if (*yytext=='\n') yyLineNr++;
 					  addOutput('\n');
@@ -1426,7 +1434,7 @@ RCSTAG    "$"{ID}":"[^\n$]+"$"
   					}
 <RelatesParam1>{DOCNL}			{ // missing argument
   					  warn(yyFileName,yyLineNr,
-					      "Warning: Missing argument of \\relates or \\memberof command"
+					      "warning: Missing argument of \\relates or \\memberof command"
 					      );
   					  if (*yytext=='\n') yyLineNr++;
 					  addOutput('\n');
@@ -1461,7 +1469,7 @@ RCSTAG    "$"{ID}":"[^\n$]+"$"
   					}
 <SectionLabel>{DOCNL}			{ // missing argument
   					  warn(yyFileName,yyLineNr,
-					      "Warning: \\section command has no label"
+					      "warning: \\section command has no label"
 					      );
   					  if (*yytext=='\n') yyLineNr++;
 					  addOutput('\n');
@@ -1469,7 +1477,7 @@ RCSTAG    "$"{ID}":"[^\n$]+"$"
   					}
 <SectionLabel>.				{ // invalid character for section label
   					  warn(yyFileName,yyLineNr,
-					      "Warning: Invalid or missing section label"
+					      "warning: Invalid or missing section label"
 					      );
 					  BEGIN(Comment);
   					}
@@ -1516,7 +1524,7 @@ RCSTAG    "$"{ID}":"[^\n$]+"$"
   					}
 <SubpageLabel>{DOCNL}			{ // missing argument
   					  warn(yyFileName,yyLineNr,
-					      "Warning: \\subpage command has no label"
+					      "warning: \\subpage command has no label"
 					      );
   					  if (*yytext=='\n') yyLineNr++;
 					  addOutput('\n');
@@ -1546,7 +1554,7 @@ RCSTAG    "$"{ID}":"[^\n$]+"$"
   					}
 <AnchorLabel>{DOCNL}			{ // missing argument
   					  warn(yyFileName,yyLineNr,
-					      "Warning: \\anchor command has no label"
+					      "warning: \\anchor command has no label"
 					      );
   					  if (*yytext=='\n') yyLineNr++;
 					  addOutput('\n');
@@ -1554,7 +1562,7 @@ RCSTAG    "$"{ID}":"[^\n$]+"$"
   					}
 <AnchorLabel>.				{ // invalid character for anchor label
   					  warn(yyFileName,yyLineNr,
-					      "Warning: Invalid or missing anchor label"
+					      "warning: Invalid or missing anchor label"
 					      );
 					  BEGIN(Comment);
   					}
@@ -1586,7 +1594,7 @@ RCSTAG    "$"{ID}":"[^\n$]+"$"
 					  if (g_commentCount<0 && blockName!="verbatim")
 					  {
 					    warn(yyFileName,yyLineNr,
-					         "Warning: found */ without matching /* while inside a \\%s block! Perhaps a missing \\end%s?\n",blockName.data(),blockName.data());
+					         "warning: found */ without matching /* while inside a \\%s block! Perhaps a missing \\end%s?\n",blockName.data(),blockName.data());
 					  }
   					}
 <FormatBlock>.				{
@@ -1594,7 +1602,7 @@ RCSTAG    "$"{ID}":"[^\n$]+"$"
   					}
 <FormatBlock><<EOF>>			{
                                           warn(yyFileName,yyLineNr,
-	                                    "Warning: reached end of comment while inside a @%s block; check for missing @end%s tag!",
+	                                    "warning: reached end of comment while inside a @%s block; check for missing @end%s tag!",
 	                                    blockName.data(),blockName.data()
 	                                  );				
 					  yyterminate();
@@ -1670,7 +1678,7 @@ RCSTAG    "$"{ID}":"[^\n$]+"$"
   					  if (guards.isEmpty())
 					  {
 					    warn(yyFileName,yyLineNr,
-						"Warning: found @endif without matching start command");
+						"warning: found @endif without matching start command");
 					  }
 					  else
 					  {
@@ -1682,7 +1690,7 @@ RCSTAG    "$"{ID}":"[^\n$]+"$"
   					  if (guards.isEmpty())
 					  {
 					    warn(yyFileName,yyLineNr,
-						"Warning: found @else without matching start command");
+						"warning: found @else without matching start command");
 					  }
 					  else
 					  {
@@ -1699,7 +1707,7 @@ RCSTAG    "$"{ID}":"[^\n$]+"$"
   					  if (guards.isEmpty())
 					  {
 					    warn(yyFileName,yyLineNr,
-						"Warning: found @elseif without matching start command");
+						"warning: found @elseif without matching start command");
 					  }
 					  else
 					  {
@@ -1768,6 +1776,9 @@ RCSTAG    "$"{ID}":"[^\n$]+"$"
 					    BEGIN(Comment);
 					  }
   					}
+<SkipInternal>[@\\]"endinternal"[ \t]*  {
+					  BEGIN(Comment);
+					}
 <SkipInternal>[^ \\@\n]+		{ // skip non-special characters
   					}
 <SkipInternal>.				{ // any other character
@@ -1793,7 +1804,7 @@ RCSTAG    "$"{ID}":"[^\n$]+"$"
 
   /* ----- handle argument of ingroup command ------- */
 
-<InGroupParam>{ID}			{ // group id
+<InGroupParam>{LABELID}			{ // group id
   					  current->groups->append(
 					    new Grouping(yytext, Grouping::GROUPING_INGROUP)
 					  );
@@ -1803,7 +1814,7 @@ RCSTAG    "$"{ID}":"[^\n$]+"$"
   					  if (!inGroupParamFound)
 					  {
   					    warn(yyFileName,yyLineNr,
-					        "Warning: Missing group name for \\ingroup command"
+					        "warning: Missing group name for \\ingroup command"
 					        );
 					  }
   					  if (*yytext=='\n') yyLineNr++;
@@ -1884,7 +1895,7 @@ RCSTAG    "$"{ID}":"[^\n$]+"$"
   					}
 <InheritParam>{DOCNL}			{ // missing argument
   					  warn(yyFileName,yyLineNr,
-					      "Warning: \\inherit command has no argument"
+					      "warning: \\inherit command has no argument"
 					      );
   					  if (*yytext=='\n') yyLineNr++;
 					  addOutput('\n');
@@ -1892,7 +1903,7 @@ RCSTAG    "$"{ID}":"[^\n$]+"$"
   					}
 <InheritParam>.				{ // invalid character for anchor label
   					  warn(yyFileName,yyLineNr,
-					      "Warning: Invalid or missing name for \\inherit command"
+					      "warning: Invalid or missing name for \\inherit command"
 					      );
 					  BEGIN(Comment);
   					}
@@ -1907,7 +1918,7 @@ RCSTAG    "$"{ID}":"[^\n$]+"$"
   					}
 <ExtendsParam>{DOCNL}			{ // missing argument
   					  warn(yyFileName,yyLineNr,
-					      "Warning: \\extends or \\implements command has no argument"
+					      "warning: \\extends or \\implements command has no argument"
 					      );
   					  if (*yytext=='\n') yyLineNr++;
 					  addOutput('\n');
@@ -2201,7 +2212,7 @@ static bool handleMemberOf(const QCString &)
 
 static bool handleRefItem(const QCString &)
 {
-  addOutput("@refitem ");
+  addOutput(" @refitem ");
   BEGIN(LineParam);
   return FALSE;
 }
@@ -2209,7 +2220,7 @@ static bool handleRefItem(const QCString &)
 static bool handleSection(const QCString &s)
 {
   setOutput(OutputDoc);
-  addOutput("@"+s+" ");
+  addOutput(" @"+s+" ");
   BEGIN(SectionLabel);
   if      (s=="section")       g_sectionLevel=1;
   else if (s=="subsection")    g_sectionLevel=2;
@@ -2226,23 +2237,23 @@ static bool handleSubpage(const QCString &s)
      )
   {
     warn(yyFileName,yyLineNr,
-	"Warning: found \\subpage command in a comment block that is not marked as a page!");
+	"warning: found \\subpage command in a comment block that is not marked as a page!");
   }
-  addOutput("@"+s+" ");
+  addOutput(" @"+s+" ");
   BEGIN(SubpageLabel);
   return FALSE;
 }
 
 static bool handleAnchor(const QCString &s)
 {
-  addOutput("@"+s+" ");
+  addOutput(" @"+s+" ");
   BEGIN(AnchorLabel);
   return FALSE;
 }
 
 static bool handleFormatBlock(const QCString &s)
 {
-  addOutput("@"+s+" ");
+  addOutput(" @"+s+" ");
   //printf("handleFormatBlock(%s)\n",s.data());
   blockName=s;
   g_commentCount=0;
@@ -2252,7 +2263,7 @@ static bool handleFormatBlock(const QCString &s)
 
 static bool handleAddIndex(const QCString &)
 {
-  addOutput("@addindex ");
+  addOutput(" @addindex ");
   BEGIN(LineParam);
   return FALSE;
 }
@@ -2278,7 +2289,7 @@ static bool handleElseIf(const QCString &)
   if (guards.isEmpty())
   {
     warn(yyFileName,yyLineNr,
-	"Warning: found \\else without matching start command");
+	"warning: found \\else without matching start command");
   }
   else
   {
@@ -2293,7 +2304,7 @@ static bool handleElse(const QCString &)
   if (guards.isEmpty())
   {
     warn(yyFileName,yyLineNr,
-	"Warning: found \\else without matching start command");
+	"warning: found \\else without matching start command");
   }
   else
   {
@@ -2307,7 +2318,7 @@ static bool handleEndIf(const QCString &)
   if (guards.isEmpty())
   {
     warn(yyFileName,yyLineNr,
-	"Warning: found \\endif without matching start command");
+	"warning: found \\endif without matching start command");
   }
   else
   {
@@ -2370,7 +2381,7 @@ static bool handleInternal(const QCString &)
   }
   else
   {
-    addOutput("\\internal "); 
+    //addOutput("\\internal "); 
   }
   return FALSE;
 }
@@ -2449,7 +2460,7 @@ static void checkFormula()
 {
   if (YY_START==ReadFormulaShort || YY_START==ReadFormulaLong)
   {
-    warn(yyFileName,yyLineNr,"Warning: End of comment block while inside formula.");
+    warn(yyFileName,yyLineNr,"warning: End of comment block while inside formula.");
   }
 }
 
@@ -2546,7 +2557,7 @@ bool parseCommentBlock(/* in */     ParserInterface *parser,
   newEntryNeeded = needNewEntry;
 
   // if we did not proceed during this call, it does not make
-  // sence to continue, since we get stuck. See bug 567346 for situations
+  // sense to continue, since we get stuck. See bug 567346 for situations
   // were this happens
   if (parseMore && position==inputPosition) parseMore=FALSE;
 
@@ -2574,14 +2585,14 @@ void groupLeaveFile(const char *fileName,int line)
 {
   //if (g_memberGroupId!=DOX_NOGROUP)
   //{
-  //  warn(fileName,line,"Warning: end of file while inside a member group\n");
+  //  warn(fileName,line,"warning: end of file while inside a member group\n");
   //}
   g_memberGroupId=DOX_NOGROUP;
   g_memberGroupRelates.resize(0);
   g_memberGroupDocs.resize(0);
   if (!g_autoGroupStack.isEmpty())
   {
-    warn(fileName,line,"Warning: end of file while inside a group\n");
+    warn(fileName,line,"warning: end of file while inside a group\n");
   }
 }
 
@@ -2589,7 +2600,7 @@ void groupEnterCompound(const char *fileName,int line,const char *name)
 {
   if (g_memberGroupId!=DOX_NOGROUP)
   {
-    warn(fileName,line,"Warning: try to put compound %s inside a member group\n",name);
+    warn(fileName,line,"warning: try to put compound %s inside a member group\n",name);
   }
   g_memberGroupId=DOX_NOGROUP;
   g_memberGroupRelates.resize(0);
@@ -2612,7 +2623,7 @@ void groupLeaveCompound(const char *,int,const char * /*name*/)
   //printf("groupLeaveCompound(%s)\n",name);
   //if (g_memberGroupId!=DOX_NOGROUP)
   //{
-  //  warn(fileName,line,"Warning: end of compound %s while inside a member group\n",name);
+  //  warn(fileName,line,"warning: end of compound %s while inside a member group\n",name);
   //}
   g_memberGroupId=DOX_NOGROUP;
   g_memberGroupRelates.resize(0);

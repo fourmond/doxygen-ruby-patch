@@ -1002,6 +1002,7 @@ static void generateClassOrGlobalLink(CodeOutputInterface &ol,char *clName,
                       g_currentMemberDef ? g_currentMemberDef : g_currentDefinition);
     writeMultiLineCodeLink(ol,cd->getReference(),cd->getOutputFileBase(),0,clName,cd->briefDescriptionAsTooltip());
     addToSearchIndex(className);
+    g_theCallContext.setClass(cd);
     if (md)
     {
       Definition *d = md->getOuterScope()==Doxygen::globalScope ?
@@ -2380,7 +2381,9 @@ OPERATOR {ARITHOP}|{ASSIGNOP}|{LOGICOP}|{BITOP}
 					}
 <Body>{SCOPENAME}/{BN}*[;,)\]]		{ // "int var;" or "var, var2" or "debug(f) macro" 
 					  addType();
-					  generateClassOrGlobalLink(*g_code,yytext,FALSE,TRUE);
+					  // changed this to generateFunctionLink, see bug 624514
+					  //generateClassOrGlobalLink(*g_code,yytext,FALSE,TRUE);
+					  generateFunctionLink(*g_code,yytext);
   					  g_name+=yytext; 
 					}
 <Body>{SCOPENAME}/{B}* 			{ // p->func()
@@ -2390,8 +2393,8 @@ OPERATOR {ARITHOP}|{ASSIGNOP}|{LOGICOP}|{BITOP}
 					}
 <Body>"("{B}*("*"{B}*)+{SCOPENAME}*{B}*")"/{B}*	{  // (*p)->func() but not "if (p) ..."
 					  g_code->codify(yytext);
-					  int s=0;while (s<yyleng && !isId(yytext[s])) s++;
-                                          int e=yyleng-1;while (e>=0 && !isId(yytext[e])) e--;
+					  int s=0;while (s<(int)yyleng && !isId(yytext[s])) s++;
+                                          int e=(int)yyleng-1;while (e>=0 && !isId(yytext[e])) e--;
 					  QCString varname = ((QCString)yytext).mid(s,e-s+1); 
 					  addType();
   					  g_name=varname; 
@@ -2848,13 +2851,15 @@ OPERATOR {ARITHOP}|{ASSIGNOP}|{LOGICOP}|{BITOP}
 					    if (cd)
 					    {
 					      setClassScope(cd->name());
+  					      g_scopeStack.push(SCOPEBLOCK);
+                                              DBG_CTX((stderr,"** scope stack push SCOPEBLOCK\n"));
 					    }
-					    else
+					    else 
 					    {
-					      setClassScope(g_realScope);
+					      //setClassScope(g_realScope);
+  					      g_scopeStack.push(INNERBLOCK);
+                                              DBG_CTX((stderr,"** scope stack push INNERBLOCK\n"));
 					    }
-                                            DBG_CTX((stderr,"** scope stack push SCOPEBLOCK\n"));
-  					    g_scopeStack.push(SCOPEBLOCK);
 					  }
 					  else
 					  {
@@ -3353,7 +3358,8 @@ void parseCCode(CodeOutputInterface &od,const char *className,const QCString &s,
 		  int startLine,int endLine,bool inlineFragment,
 		  MemberDef *memberDef,bool showLineNumbers)
 {
-  //printf("***parseCode() exBlock=%d exName=%s fd=%p\n",exBlock,exName,fd);
+  //printf("***parseCode() exBlock=%d exName=%s fd=%p className=%s\n",
+  //    exBlock,exName,fd,className);
   if (s.isEmpty()) return;
   if (g_codeClassSDict==0)
   {
@@ -3383,6 +3389,7 @@ void parseCCode(CodeOutputInterface &od,const char *className,const QCString &s,
   g_theCallContext.clear();
   g_scopeStack.clear();
   g_classScope    = className;
+  //printf("parseCCode %s\n",className);
   g_exampleBlock  = exBlock; 
   g_exampleName   = exName;
   g_sourceFileDef = fd;
@@ -3405,7 +3412,8 @@ void parseCCode(CodeOutputInterface &od,const char *className,const QCString &s,
   g_bracketCount = 0;
   if (!g_exampleName.isEmpty())
   {
-    g_exampleFile = convertNameToFile(g_exampleName+"-example");
+    g_exampleFile = convertNameToFile(g_exampleName+"-example",FALSE,TRUE);
+    //printf("g_exampleFile=%s\n",g_exampleFile.data());
   }
   g_includeCodeFragment = inlineFragment;
   //printf("** exBlock=%d exName=%s include=%d\n",exBlock,exName,inlineFragment);

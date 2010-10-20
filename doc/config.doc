@@ -67,6 +67,7 @@ followed by the descriptions of the tags grouped by category.
 \refitem cfg_caller_graph CALLER_GRAPH
 \refitem cfg_case_sense_names CASE_SENSE_NAMES 
 \refitem cfg_chm_file CHM_FILE
+\refitem cfg_chm_index_encoding CHM_INDEX_ENCODING
 \refitem cfg_class_diagrams CLASS_DIAGRAMS 
 \refitem cfg_class_graph CLASS_GRAPH
 \refitem cfg_collaboration_graph COLLABORATION_GRAPH
@@ -103,6 +104,7 @@ followed by the descriptions of the tags grouped by category.
 \refitem cfg_example_recursive EXAMPLE_RECURSIVE
 \refitem cfg_exclude EXCLUDE
 \refitem cfg_exclude_patterns EXCLUDE_PATTERNS
+\refitem cfg_exclude_symbols EXCLUDE_SYMBOLS
 \refitem cfg_exclude_symlinks EXCLUDE_SYMLINKS
 \refitem cfg_expand_as_defined EXPAND_AS_DEFINED
 \refitem cfg_expand_only_predef EXPAND_ONLY_PREDEF
@@ -122,6 +124,7 @@ followed by the descriptions of the tags grouped by category.
 \refitem cfg_filter_source_files FILTER_SOURCE_FILES
 \refitem cfg_force_local_includes FORCE_LOCAL_INCLUDES
 \refitem cfg_formula_fontsize FORMULA_FONTSIZE
+\refitem cfg_formula_transparent FORMULA_TRANSPARENT
 \refitem cfg_full_path_names FULL_PATH_NAMES
 \refitem cfg_generate_autogen_def GENERATE_AUTOGEN_DEF
 \refitem cfg_generate_buglist GENERATE_BUGLIST
@@ -153,6 +156,9 @@ followed by the descriptions of the tags grouped by category.
 \refitem cfg_hide_undoc_members HIDE_UNDOC_MEMBERS
 \refitem cfg_hide_undoc_relations HIDE_UNDOC_RELATIONS
 \refitem cfg_html_align_members HTML_ALIGN_MEMBERS
+\refitem cfg_html_colorstyle_gamma HTML_COLORSTYLE_GAMMA
+\refitem cfg_html_colorstyle_hue HTML_COLORSTYLE_HUE
+\refitem cfg_html_colorstyle_sat HTML_COLORSTYLE_SAT
 \refitem cfg_html_dynamic_sections HTML_DYNAMIC_SECTIONS
 \refitem cfg_html_file_extension HTML_FILE_EXTENSION
 \refitem cfg_html_footer HTML_FOOTER
@@ -163,6 +169,7 @@ followed by the descriptions of the tags grouped by category.
 \refitem cfg_idl_property_support IDL_PROPERTY_SUPPORT
 \refitem cfg_ignore_prefix IGNORE_PREFIX
 \refitem cfg_image_path IMAGE_PATH
+\refitem cfg_include_file_patterns INCLUDE_FILE_PATTERNS
 \refitem cfg_include_graph INCLUDE_GRAPH
 \refitem cfg_include_path INCLUDE_PATH
 \refitem cfg_included_by_graph INCLUDED_BY_GRAPH
@@ -180,14 +187,17 @@ followed by the descriptions of the tags grouped by category.
 \refitem cfg_latex_header LATEX_HEADER
 \refitem cfg_latex_hide_indices LATEX_HIDE_INDICES
 \refitem cfg_latex_output LATEX_OUTPUT
+\refitem cfg_latex_source_code LATEX_SOURCE_CODE
 \refitem cfg_layout_file LAYOUT_FILE
 \refitem cfg_macro_expansion MACRO_EXPANSION
 \refitem cfg_makeindex_cmd_name MAKEINDEX_CMD_NAME
 \refitem cfg_man_extension MAN_EXTENSION
 \refitem cfg_man_links MAN_LINKS
 \refitem cfg_man_output MAN_OUTPUT
+\refitem cfg_mathjax_relpath MATHJAX_RELPATH
 \refitem cfg_max_dot_graph_depth MAX_DOT_GRAPH_DEPTH
 \refitem cfg_max_initializer_lines MAX_INITIALIZER_LINES
+\refitem cfg_mscfile_dirs MSCFILE_DIRS
 \refitem cfg_mscgen_path MSCGEN_PATH
 \refitem cfg_multiline_cpp_is_brief MULTILINE_CPP_IS_BRIEF
 \refitem cfg_optimize_for_fortran OPTIMIZE_FOR_FORTRAN
@@ -254,6 +264,7 @@ followed by the descriptions of the tags grouped by category.
 \refitem cfg_uml_look UML_LOOK
 \refitem cfg_use_htags USE_HTAGS
 \refitem cfg_use_inline_trees USE_INLINE_TREES
+\refitem cfg_use_mathjax USE_MATHJAX
 \refitem cfg_use_pdflatex USE_PDFLATEX
 \refitem cfg_verbatim_headers VERBATIM_HEADERS
 \refitem cfg_warn_format WARN_FORMAT
@@ -398,18 +409,6 @@ followed by the descriptions of the tags grouped by category.
  definition is used. Otherwise one should specify the include paths that 
  are normally passed to the compiler using the -I flag.
 
-
-
-\anchor cfg_case_sense_names
-<dt>\c CASE_SENSE_NAMES <dd>
- \addindex CASE_SENSE_NAMES
- If the \c CASE_SENSE_NAMES tag is set to \c NO then doxygen
- will only generate file names in lower-case letters. If set to
- \c YES upper-case letters are also allowed. This is useful if you have
- classes or files whose names only differ in case and if your file system
- supports case sensitive file names. Windows users are advised to set this
- option to NO.
-
 \anchor cfg_short_names
 <dt>\c SHORT_NAMES <dd>
  \addindex SHORT_NAMES
@@ -441,7 +440,7 @@ followed by the descriptions of the tags grouped by category.
  If you use STL classes (i.e. std::string, std::vector, etc.) but do not want to
  include (a tag file for) the STL sources as input, then you should
  set this tag to \c YES in order to let doxygen match functions declarations and
- definitions whose arguments contain STL classes (e.g. func(std::string); v.s.
+ definitions whose arguments contain STL classes (e.g. func(std::string); versus
  func(std::string) {}). This also make the inheritance and collaboration
  diagrams that involve STL classes more complete and accurate.
 
@@ -482,9 +481,9 @@ followed by the descriptions of the tags grouped by category.
  \addindex MULTILINE_CPP_IS_BRIEF
   The MULTILINE_CPP_IS_BRIEF tag can be set to YES to make Doxygen
   treat a multi-line C++ special comment block (i.e. a block of //! or ///
-  comments) as a brief description. This used to be the default behaviour.
+  comments) as a brief description. This used to be the default behavior.
   The new default is to treat a multi-line C++ comment block as a detailed
-  description. Set this tag to YES if you prefer the old behaviour instead.
+  description. Set this tag to YES if you prefer the old behavior instead.
   Note that setting this tag to YES also means that rational rose comments
   are not recognized any more.
 
@@ -571,7 +570,7 @@ followed by the descriptions of the tags grouped by category.
  Doxygen has a built-in mapping, but you can override or extend it using this tag.
  The format is ext=language, where ext is a file extension, and language is one of
  the parsers supported by doxygen: IDL, Java, Javascript, C#, C, C++, D, PHP,
- Objective-C, Python, Fortran, VHDL, C, C++. For instance to make doxygen treat
+ Objective-C, Python, Fortran, VHDL. For instance to make doxygen treat
  .inc files as Fortran files (default is PHP), and .f files as C (default is Fortran),
  use: inc=Fortran f=C
 
@@ -604,10 +603,10 @@ followed by the descriptions of the tags grouped by category.
  For small to medium size projects (<1000 input files) the default value is
  probably good enough. For larger projects a too small cache size can cause 
  doxygen to be busy swapping symbols to and from disk most of the time
- causing a significant performance penality.
+ causing a significant performance penalty.
  If the system has enough physical memory increasing the cache will improve the
  performance by keeping more symbols in memory. Note that the value works on
- a logarithmic scale so increasing the size by one will rougly double the
+ a logarithmic scale so increasing the size by one will roughly double the
  memory usage. The cache size is given by this formula: 
  \f$2^{(16+\mbox{SYMBOL\_CACHE\_SIZE})}\f$. The valid range is 0..9, the default is 0, 
  corresponding to a cache size of \f$2^{16} = 65536\f$ symbols.
@@ -706,6 +705,16 @@ function's detailed documentation block.
  that is typed after a \ref cmdinternal "\\internal" command is included. If the tag is set
  to \c NO (the default) then the documentation will be excluded.
  Set it to \c YES to include the internal documentation.
+
+\anchor cfg_case_sense_names
+<dt>\c CASE_SENSE_NAMES <dd>
+ \addindex CASE_SENSE_NAMES
+ If the \c CASE_SENSE_NAMES tag is set to \c NO then doxygen
+ will only generate file names in lower-case letters. If set to
+ \c YES upper-case letters are also allowed. This is useful if you have
+ classes or files whose names only differ in case and if your file system
+ supports case sensitive file names. Windows users are advised to set this
+ option to NO.
 
 \anchor cfg_hide_scope_names
 <dt>\c HIDE_SCOPE_NAMES <dd>
@@ -858,6 +867,50 @@ function's detailed documentation block.
  Namespaces page.  This will remove the Namespaces entry from the Quick Index
  and from the Folder Tree View (if specified). The default is \c YES.
 
+\anchor cfg_file_version_filter
+<dt>\c FILE_VERSION_FILTER <dd>
+ \addindex FILE_VERSION_FILTER
+ The \c FILE_VERSION_FILTER tag can be used to specify a program or script that
+ doxygen should invoke to get the current version for each file (typically from the
+ version control system). Doxygen will invoke the program by executing (via
+ popen()) the command <code>command input-file</code>, where \c command is 
+ the value of the \c FILE_VERSION_FILTER tag, and \c input-file is the name 
+ of an input file provided by doxygen. 
+ Whatever the program writes to standard output is used as the file version. 
+
+Example of using a shell script as a filter for Unix:
+\verbatim
+ FILE_VERSION_FILTER = "/bin/sh versionfilter.sh"
+\endverbatim
+
+Example shell script for CVS:
+\verbatim
+#!/bin/sh
+cvs status $1 | sed -n 's/^[ \]*Working revision:[ \t]*\([0-9][0-9\.]*\).*/\1/p'
+\endverbatim 
+ 
+Example shell script for Subversion:
+\verbatim
+#!/bin/sh
+svn stat -v $1 | sed -n 's/^[ A-Z?\*|!]\{1,15\}/r/;s/ \{1,15\}/\/r/;s/ .*//p'
+\endverbatim
+
+Example filter for ClearCase:
+\verbatim
+FILE_VERSION_INFO = "cleartool desc -fmt \%Vn"
+\endverbatim
+
+\anchor cfg_layout_file
+<dt>\c LAYOUT_FILE <dd>
+ The \c LAYOUT_FILE tag can be used to specify a layout file which will be parsed by
+ doxygen. The layout file controls the global structure of the generated output files
+ in an output format independent way. The create the layout file that represents
+ doxygen's defaults, run doxygen with the -l option. You can optionally specify a
+ file name after the option, if omitted DoxygenLayout.xml will be used as the name
+ of the layout file. Note that if you run doxygen from a directory containing 
+ a file called DoxygenLayout.xml, doxygen will parse it automatically even if 
+ the \c LAYOUT_FILE tag is left empty.
+
 </dl>
 
 \section messages_input Options related to warning and progress messages 
@@ -898,7 +951,7 @@ function's detailed documentation block.
 \anchor cfg_warn_no_paramdoc
 <dt>\c WARN_NO_PARAMDOC <dd>
  \addindex WARN_NO_PARAMDOC
- This \c WARN_NO_PARAMDOC option can be abled to get warnings for 
+ This \c WARN_NO_PARAMDOC option can be enabled to get warnings for 
  functions that are documented, but have no documentation for their parameters
  or return value. If set to \c NO (the default) doxygen will only warn about
  wrong or incomplete parameter documentation, but not about the absence of
@@ -953,53 +1006,10 @@ function's detailed documentation block.
  (like \c *.cpp and \c *.h ) to filter out the source-files 
  in the directories. If left blank the following patterns are tested:
  <code>
- *.c *.cc *.cxx *.cpp *.c++ *.java *.ii *.ixx *.ipp *.i++ *.inl *.h *.hh *.hxx *.hpp 
- *.h++ *.idl *.odl *.cs *.php *.php3 *.inc *.m *.mm
+ *.c *.cc *.cxx *.cpp *.c++ *.d *.java *.ii *.ixx *.ipp *.i++ *.inl *.h *.hh 
+ *.hxx *.hpp *.h++ *.idl *.odl *.cs *.php *.php3 *.inc *.m *.mm *.dox *.py 
+ *.f90 *.f *.vhd *.vhdl
  </code>
-
-\anchor cfg_file_version_filter
-<dt>\c FILE_VERSION_FILTER <dd>
- \addindex FILE_VERSION_FILTER
- The \c FILE_VERSION_FILTER tag can be used to specify a program or script that
- doxygen should invoke to get the current version for each file (typically from the
- version control system). Doxygen will invoke the program by executing (via
- popen()) the command <code>command input-file</code>, where \c command is 
- the value of the \c FILE_VERSION_FILTER tag, and \c input-file is the name 
- of an input file provided by doxygen. 
- Whatever the program writes to standard output is used as the file version. 
-
-Example of using a shell script as a filter for Unix:
-\verbatim
- FILE_VERSION_FILTER = "/bin/sh versionfilter.sh"
-\endverbatim
-
-Example shell script for CVS:
-\verbatim
-#!/bin/sh
-cvs status $1 | sed -n 's/^[ \]*Working revision:[ \t]*\([0-9][0-9\.]*\).*/\1/p'
-\endverbatim 
- 
-Example shell script for Subversion:
-\verbatim
-#!/bin/sh
-svn stat -v $1 | sed -n 's/^[ A-Z?\*|!]\{1,15\}/r/;s/ \{1,15\}/\/r/;s/ .*//p'
-\endverbatim
-
-Example filter for ClearCase:
-\verbatim
-FILE_VERSION_INFO = "cleartool desc -fmt \%Vn"
-\endverbatim
-
-\anchor cfg_layout_file
-<dt>\c LAYOUT_FILE <dd>
- The \c LAYOUT_FILE tag can be used to specify a layout file which will be parsed by
- doxygen. The layout file controls the global structure of the generated output files
- in an output format independent way. The create the layout file that represents
- doxygen's defaults, run doxygen with the -l option. You can optionally specify a
- file name after the option, if omitted DoxygenLayout.xml will be used as the name
- of the layout file. Note that if you run doxygen from a directory containing 
- a file called DoxygenLayout.xml, doxygen will parse it automatically even if 
- the \c LAYOUT_FILE tag is left empty.
 
 \anchor cfg_recursive
 <dt>\c RECURSIVE <dd>
@@ -1027,6 +1037,14 @@ FILE_VERSION_INFO = "cleartool desc -fmt \%Vn"
  If the value of the \c INPUT tag contains directories, you can use the
  \c EXCLUDE_PATTERNS tag to specify one or more wildcard patterns to exclude
  certain files from those directories.
+
+\anchor cfg_exclude_symbols
+<dt>\c EXCLUDE_SYMBOLS <dd>
+The \c EXCLUDE_SYMBOLS tag can be used to specify one or more symbol names 
+(namespaces, classes, functions, etc.) that should be excluded from the 
+output. The symbol name can be a fully qualified name, a word, or if the 
+wildcard * is used, a substring. Examples: ANamespace, AClass, 
+AClass::ANamespace, ANamespace::*Test 
 
  Note that the wildcards are matched against the file with absolute path, 
  so to exclude all test directories use the pattern 
@@ -1296,6 +1314,33 @@ FILE_VERSION_INFO = "cleartool desc -fmt \%Vn"
  See also section \ref doxygen_usage for information on how to generate
  the style sheet that doxygen normally uses.
 
+\anchor cfg_html_colorstyle_hue
+<dt>\c HTML_COLORSTYLE_HUE <dd>
+ \addindex HTML_COLOR_STYLE_HUE
+ The \c HTML_COLORSTYLE_HUE tag controls the color of the HTML output. 
+ Doxygen will adjust the colors in the stylesheet and background images 
+ according to this color. Hue is specified as an angle on a colorwheel, 
+ see http://en.wikipedia.org/wiki/Hue for more information. 
+ For instance the value 0 represents red, 60 is yellow, 120 is green, 
+ 180 is cyan, 240 is blue, 300 purple, and 360 is red again. 
+ The allowed range is 0 to 359. 
+
+\anchor cfg_html_colorstyle_sat
+<dt>\c HTML_COLORSTYLE_SAT <dd>
+ \addindex HTML_COLORSTYLE_SAT
+ The \c HTML_COLORSTYLE_SAT tag controls the purity (or saturation) of 
+ the colors in the HTML output. For a value of 0 the output will use 
+ grayscales only. A value of 255 will produce the most vivid colors. 
+
+\anchor cfg_html_colorstyle_gamma
+<dt>\c HTML_COLORSTYLE_GAMMA <dd>
+ The \c HTML_COLORSTYLE_GAMMA tag controls the gamma correction applied to 
+ the luminance component of the colors in the HTML output. Values below 
+ 100 gradually make the output lighter, whereas values above 100 make 
+ the output darker. The value divided by 100 is the actual gamma applied, 
+ so 80 represents a gamma of 0.8, The value 220 represents a gamma of 2.2, 
+ and 100 does not change the gamma.
+
 \anchor cfg_html_timestamp
 <dt>\c HTML_TIMESTAMP <dd>
  \addindex HTML_TIMESTAMP
@@ -1405,6 +1450,13 @@ The GENERATE_PUBLISHER_NAME tag identifies the documentation publisher.
  If the \c GENERATE_HTMLHELP tag is set to \c YES, the \c GENERATE_CHI flag
  controls if a separate .chi index file is generated (<code>YES</code>) or that
  it should be included in the master .chm file (<code>NO</code>).
+
+\anchor cfg_chm_index_encoding
+<dt>\c CHM_INDEX_ENCODING <dd>
+ \addindex CHM_INDEX_ENCODING
+ If the \c GENERATE_HTMLHELP tag is set to \c YES, the \c CHM_INDEX_ENCODING 
+ is used to encode HtmlHelp index (hhk), content (hhc) and project file 
+ content. 
 
 \anchor cfg_binary_toc
 <dt>\c BINARY_TOC <dd>
@@ -1526,7 +1578,7 @@ implemented using a PHP enabled web server instead of at the web client
 using Javascript. Doxygen will generate the search PHP script and index 
 file to put on the web server. The advantage of the server
 based approach is that it scales better to large projects and also allows
-full text search. The disadvances is that it is more difficult to setup 
+full text search. The disadvantages are that it is more difficult to setup 
 and does not have live searching capabilities.
 
 \anchor cfg_disable_index
@@ -1541,8 +1593,10 @@ and does not have live searching capabilities.
 \anchor cfg_enum_values_per_line
 <dt>\c ENUM_VALUES_PER_LINE <dd>
  \addindex ENUM_VALUES_PER_LINE
- This tag can be used to set the number of enum values (range [1..20])
- that doxygen will group on one line in the generated HTML documentation.
+ This tag can be used to set the number of enum values (range [0,1..20]) 
+ that doxygen will group on one line in the generated HTML documentation. 
+ Note that a value of 0 will completely suppress the enum values from
+ appearing in the overview section.
 
 \anchor cfg_generate_treeview
 <dt>\c GENERATE_TREEVIEW <dd>
@@ -1556,7 +1610,7 @@ and does not have live searching capabilities.
  Windows users are probably better off using the HTML help feature.
 
  Via custom stylesheets (see \ref cfg_html_stylesheet "HTML_STYLESHEET")
- one can further \ref doxygen_finetune "fine tune" the look of the index.
+ one can further \ref doxygen_finetune "fine-tune" the look of the index.
  As an example, the default style sheet generated by doxygen has an
  example that shows how to put an image at the root of the tree instead of
  the \ref cfg_project_name "project name".
@@ -1588,6 +1642,37 @@ and Class Hierarchy pages using a tree view instead of an ordered list.
  when you change the font size after a successful doxygen run you need
  to manually remove any <code>form_*.png</code> images from the HTML 
  output directory to force them to be regenerated.
+
+\anchor cfg_formula_transparent
+<dt>\c FORMULA_TRANSPARENT <dd>
+ \addindex FORMULA_TRANSPARENT
+ Use the \c FORMULA_TRANPARENT tag to determine whether or not the images 
+ generated for formulas are transparent PNGs. Transparent PNGs are 
+ not supported properly for IE 6.0, but are supported on all modern browsers. 
+ Note that when changing this option you need to delete any form_*.png files 
+ in the HTML output before the changes have effect. 
+
+\anchor cfg_use_mathjax
+<dt>\c USE_MATHJAX <dd>
+ \addindex USE_MATHJAX
+ Enable the \c USE_MATHJAX option to render LaTeX formulas using MathJax 
+ (see http://www.mathjax.org) which uses client side Javascript for the 
+ rendering instead of using prerendered bitmaps. Use this if you do not 
+ have LaTeX installed or if you want to formulas look prettier in the HTML 
+ output. When enabled you also need to install MathJax separately and 
+ configure the path to it using the \ref cfg_mathjax_relpath "MATHJAX_RELPATH" option.
+
+\anchor cfg_mathjax_relpath
+<dt>\c MATHJAX_RELPATH <dd>
+ \addindex MATHJAX_RELPATH
+ When MathJax is enabled you need to specify the location relative to the 
+ HTML output directory using the \c MATHJAX_RELPATH option. The destination 
+ directory should contain the MathJax.js script. For instance, if the mathjax 
+ directory is located at the same level as the HTML output directory, then 
+ \c MATHJAX_RELPATH should be <code>../mathjax</code>. The default value points to 
+ the http://www.mathjax.org site, so you can quickly see the result without installing 
+ MathJax, but it is strongly recommended to install a local copy of MathJax 
+ before deployment.
  
 </dl>
 \section latex_output LaTeX related options
@@ -1637,12 +1722,11 @@ and Class Hierarchy pages using a tree view instead of an ordered list.
  by the printer. Possible values are: 
  <ul>
  <li><code>a4</code> (210 x 297 mm).
- <li><code>a4wide</code> (same as a4, but including the a4wide package).
  <li><code>letter</code> (8.5 x 11 inches).
  <li><code>legal</code> (8.5 x 14 inches).
  <li><code>executive</code> (7.25 x 10.5 inches)
  </ul> 
- If left blank a4wide will be used.
+ If left blank a4 will be used.
 
 \anchor cfg_extra_packages
 <dt>\c EXTRA_PACKAGES <dd>
@@ -1713,6 +1797,13 @@ EXTRA_PACKAGES = times
  If \c LATEX_HIDE_INDICES is set to \c YES then doxygen will not
  include the index chapters (such as File Index, Compound Index, etc.) 
  in the output. 
+
+\anchor cfg_latex_source_code
+ <dt>\c LATEX_SOURCE_CODE <dd>
+ If \c LATEX_SOURCE_CODE is set to \c YES then doxygen will include 
+ source code with syntax highlighting in the LaTeX output. 
+ Note that which sources are shown also depends on other settings 
+ such as \ref cfg_source_browser "SOURCE_BROWSER".
 
 </dl>
 \section rtf_output RTF related options
@@ -1936,6 +2027,14 @@ EXTRA_PACKAGES = times
  contain include files that are not input files but should be processed by
  the preprocessor.
 
+\anchor cfg_include_file_patterns
+<dt>\c INCLUDE_FILE_PATTERNS <dd>
+ \addindex INCLUDE_FILE_PATTERNS
+ You can use the \c INCLUDE_FILE_PATTERNS tag to specify one or more wildcard 
+ patterns (like *.h and *.hpp) to filter out the header-files in the 
+ directories. If left blank, the patterns specified with \c FILE_PATTERNS will 
+ be used. 
+
 \anchor cfg_predefined
 <dt>\c PREDEFINED <dd>
  \addindex PREDEFINED
@@ -2032,16 +2131,15 @@ TAGFILES = file1=loc1 "file2 = loc2" ... </pre>
  \addindex CLASS_DIAGRAMS
  If the \c CLASS_DIAGRAMS tag is set to \c YES (the default) doxygen will
  generate a class diagram (in HTML and \f$\mbox{\LaTeX}\f$) for classes with base or
- super classes. Setting the tag to \c NO turns the diagrams off.
- Note that this option is superseded by the HAVE_DOT option below. 
- This is only a fallback. It is recommended to install and use dot, 
- since it yields more powerful graphs. 
+super classes. Setting the tag to NO turns the diagrams off. Note that 
+this option also works with HAVE_DOT disabled, but it is recommended to 
+install and use dot, since it yields more powerful graphs. 
 
 \anchor cfg_mscgen_path
 <dt>\c MSCGEN_PATH <dd>
  \addindex MSCGEN_PATH
  You can define message sequence charts within doxygen comments using the \ref cmdmsc "\\msc" 
- command. Doxygen will then run the <a href="http://www.mcternan.me.uk/mscgen/">msgen tool</a>) to 
+ command. Doxygen will then run the <a href="http://www.mcternan.me.uk/mscgen/">mscgen tool</a>) to 
  produce the chart and insert it in the documentation. The <code>MSCGEN_PATH</code> tag allows you to 
  specify the directory where the mscgen tool resides. If left empty the tool is assumed to 
  be found in the default search path.
@@ -2089,24 +2187,6 @@ The default size is 10pt.
  different font using \c DOT_FONTNAME you can set the path where dot 
  can find it using this tag.
  
-<dt>\c DOT_FONTNAME <dd>
- \addindex DOT_FONTNAME
- By default doxygen will write a font called FreeSans.ttf to the output 
- directory and reference it in all dot files that doxygen generates. This 
- font does not include all possible unicode characters however, so when you need 
- these (or just want a differently looking font) you can specify the font name 
- using \c DOT_FONTNAME. You need need to make sure dot is able to find the font, 
- which can be done by putting it in a standard location or by setting the \c DOTFONTPATH
- environment variable or by setting \c DOT_FONTPATH to the directory containing
- the font.
-
-<dt>\c DOT_FONTPATH <dd>
- \addindex DOT_FONTPATH
- By default doxygen will tell dot to use the output directory to look for the
- FreeSans.ttf font (which doxygen will put there itself). If you specify a 
- different font using \c DOT_FONTNAME you can set the path where dot 
- can find it using this tag. 
-
 \anchor cfg_class_graph
 <dt>\c CLASS_GRAPH <dd>
  \addindex CLASS_GRAPH
@@ -2237,7 +2317,14 @@ The default size is 10pt.
  \addindex DOTFILE_DIRS
  This tag can be used to specify one or more directories that 
  contain dot files that are included in the documentation (see the
- \\dotfile command).
+ \ref cmddotfile "\\dotfile" command).
+
+\anchor cfg_mscfile_dirs
+<dt>\c MSCFILE_DIRS <dd>
+ \addindex MSCFILE_DIRS
+ This tag can be used to specify one or more directories that 
+ contain msc files that are included in the documentation (see the
+ \ref cmdmscfile "\\mscfile" command).
 
 \anchor cfg_dot_transparent
 <dt>\c DOT_TRANSPARENT <dd>

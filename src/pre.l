@@ -84,6 +84,7 @@ static QCString           g_defName;
 static QCString           g_defText;
 static QCString           g_defLitText;
 static QCString           g_defArgsStr;
+static QCString           g_defExtraSpacing;
 static bool               g_defVarArgs;
 static int                g_level;
 static int                g_lastCContext;
@@ -128,6 +129,11 @@ static void setFileName(const char *name)
   QFileInfo fi(name);
   g_yyFileName=convertToQCString(fi.absFilePath());
   g_yyFileDef=findFileDef(Doxygen::inputNameDict,g_yyFileName,ambig);
+  if (g_yyFileDef==0) // if this is not an input file check if it is an
+                      // include file
+  {
+    g_yyFileDef=findFileDef(Doxygen::includeNameDict,g_yyFileName,ambig);
+  }
   //printf("setFileName(%s) g_yyFileName=%s g_yyFileDef=%p\n",
   //    name,g_yyFileName.data(),g_yyFileDef);
   if (g_yyFileDef && g_yyFileDef->isReference()) g_yyFileDef=0;
@@ -152,8 +158,7 @@ static void decrLevel()
   }
   else
   {
-    err("%s:%d: Error: More #endif's than #if's found.\n",
-	g_yyFileName.data(),g_yyLineNr);
+    warn(g_yyFileName,g_yyLineNr,"warning: More #endif's than #if's found.\n");
   }
 }
 
@@ -161,8 +166,7 @@ static bool otherCaseDone()
 {
   if (g_level==0)
   {
-    err("%s:%d: Error: Found an #else without a preceding #if.\n",
-	g_yyFileName.data(),g_yyLineNr);
+    warn(g_yyFileName,g_yyLineNr,"warning: Found an #else without a preceding #if.\n");
     return TRUE;
   }
   else
@@ -314,11 +318,13 @@ static FileState *findFile(const char *fileName,bool localInclude,bool &alreadyI
   while (s)
   {
     QCString absName = (QCString)s+"/"+fileName;
+    //printf("  Looking for %s in %s\n",fileName,s);
     FileState *fs = checkAndOpenFile(absName,alreadyIncluded);
     if (fs)
     {
       setFileName(absName);
       g_yyLineNr=1;
+      //printf("  -> found it\n");
       return fs;
     }
     else if (alreadyIncluded)
@@ -946,6 +952,34 @@ QCString removeIdsAndMarkers(const char *s)
 	result+="0L";
 	p++;
 	while ((c=*p) && isId(c)) p++;
+	if (*p=='(') // undefined function macro
+	{
+	  p++;
+	  int count=1;
+	  while ((c=*p++))
+	  {
+	    if (c=='(') count++;
+	    else if (c==')')
+	    {
+	      count--;
+	      if (count==0) break;
+	    }
+	    else if (c=='/')
+	    {
+	      char pc=c;
+	      c=*++p;
+	      if (c=='*') // start of C comment
+	      {
+		while (*p && !(pc=='*' && c=='/')) // search end of comment
+		{
+		  pc=c;
+		  c=*++p;
+		}
+		p++;
+	      }
+	    }
+	  }
+	}
       }
       else if (c=='/') // skip C comments
       {
@@ -971,7 +1005,7 @@ QCString removeIdsAndMarkers(const char *s)
 nextChar:
 	result+=c;
 	char lc=tolower(c);
-	if (!isId(lc) && lc!='.' && lc!='-' && lc!='+') inNum=FALSE;
+	if (!isId(lc) && lc!='.' /*&& lc!='-' && lc!='+'*/) inNum=FALSE;
 	p++;
       }
     }
@@ -1203,6 +1237,13 @@ static void readIncludeFile(const QCString &inc)
     // extract include path+name
     QCString incFileName=inc.mid(s,i-s).stripWhiteSpace();
 
+    QCString dosExt = incFileName.right(4);
+    if (dosExt==".exe" || dosExt==".dll" || dosExt==".tbl")
+    {
+      // skip imported binary files (e.g. M$ type libraries)
+      return;
+    }
+
     QCString oldFileName = g_yyFileName;
     FileDef *oldFileDef  = g_yyFileDef;
     int oldLineNr        = g_yyLineNr;
@@ -1218,7 +1259,7 @@ static void readIncludeFile(const QCString &inc)
       if (Debug::isFlagSet(Debug::Preprocessor))
       {
         for (i=0;i<g_includeStack.count();i++) msg("  ");
-        msg("#include %s: parsing...\n",incFileName.data());
+        //msg("#include %s: parsing...\n",incFileName.data());
       }
       if (oldFileDef)
       {
@@ -1256,8 +1297,14 @@ static void readIncludeFile(const QCString &inc)
       if (oldFileDef)
       {
 	bool ambig;
+	QCString absPath = incFileName;
+	if (QDir::isRelativePath(incFileName))
+	{
+	  QString absPath = QDir::cleanDirPath(oldFileDef->getPath()+"/"+incFileName);
+	  //printf("%s + %s -> resolved path %s\n",oldFileDef->getPath().data(),incFileName.data(),absPath.data());
+	}
 	FileDef *fd = findFileDef(Doxygen::inputNameDict,incFileName,ambig);
-	//printf("findFileDef(%s)=%p\n",incFileName.data(),fd);
+	//printf("%s::findFileDef(%s)=%p\n",oldFileDef->name().data(),incFileName.data(),fd);
 	// add include dependency to the file in which the #include was found
 	oldFileDef->addIncludeDependency(fd,incFileName,localInclude,g_isImported);
 	// add included by dependency
@@ -1270,7 +1317,7 @@ static void readIncludeFile(const QCString &inc)
       if (Debug::isFlagSet(Debug::Preprocessor))
       {
         msg("#include %s: not found or already included! skipping...\n",incFileName.data());
-        //printf("Error: include file %s not found\n",yytext);
+        //printf("error: include file %s not found\n",yytext);
       }
       if (g_curlyCount>0 && !alreadyIncluded) // failed to find #include inside { ... }
       {
@@ -1302,6 +1349,15 @@ static void endCondSection()
     bool *ctx = g_condStack.pop();
     g_skip=*ctx;
   }
+}
+
+static void forceEndCondSection()
+{
+  while (!g_condStack.isEmpty())
+  {
+    g_condStack.pop();
+  }
+  g_skip=FALSE;
 }
 
 static QCString escapeAt(const char *text)
@@ -1807,6 +1863,7 @@ CHARLIT   (("'"\\[0-7]{1,3}"'")|("'"\\."'")|("'"[^'\\\n]{1,4}"'"))
 					  }
 					}
 <SkipCommand>"endif"			{ 
+					  g_expectGuard = FALSE;
   					  decrLevel();
   				          if (--g_ifcount<0)
   					  {
@@ -1881,7 +1938,7 @@ CHARLIT   (("'"\\[0-7]{1,3}"'")|("'"\\."'")|("'"[^'\\\n]{1,4}"'"))
 					}
 <EndImport>.				{
   					}
-<DefName>{ID}/"("			{ // define with argument
+<DefName>{ID}/("\\\n")*"("		{ // define with argument
   					  //printf("Define() `%s'\n",yytext);
 					  g_argDict = new QDict<int>(31);
 					  g_argDict->setAutoDelete(TRUE);
@@ -1891,6 +1948,7 @@ CHARLIT   (("'"\\[0-7]{1,3}"'")|("'"\\."'")|("'"[^'\\\n]{1,4}"'"))
 					  g_defLitText.resize(0);
 					  g_defName = yytext;
 					  g_defVarArgs = FALSE;
+					  g_defExtraSpacing.resize(0);
 					  BEGIN(DefineArg);
   					}
 <DefName>{ID}{B}+"1"			{ // special case: define with 1 -> can be "guard"
@@ -1961,11 +2019,15 @@ CHARLIT   (("'"\\[0-7]{1,3}"'")|("'"\\."'")|("'"[^'\\\n]{1,4}"'"))
 					  }
 					  g_expectGuard=FALSE;
   					}
+<DefineArg>"\\\n"                       {
+  					  g_defExtraSpacing+="\n";
+					  g_yyLineNr++;
+                                        }
 <DefineArg>","{B}*			{ g_defArgsStr+=yytext; }
 <DefineArg>"("{B}*                      { g_defArgsStr+=yytext; }
 <DefineArg>{B}*")"{B}*			{
                                           g_defArgsStr+=yytext; 
-					  QCString tmp=(QCString)"#define "+g_defName+g_defArgsStr;
+					  QCString tmp=(QCString)"#define "+g_defName+g_defArgsStr+g_defExtraSpacing;
 					  outputArray(tmp.data(),tmp.length());
 					  g_quoteArg=FALSE;
 					  g_insideComment=FALSE;
@@ -2010,7 +2072,7 @@ CHARLIT   (("'"\\[0-7]{1,3}"'")|("'"\\."'")|("'"[^'\\\n]{1,4}"'"))
   					  BEGIN(CopyCComment);
   					}
 <DefineText>"//"[!/]?			{
-  				          outputChar('/');outputChar('/');
+  					  outputArray(yytext,yyleng);
   					  g_lastCPPContext=YY_START;
 					  g_defLitText+=' ';
   					  BEGIN(SkipCPPComment);
@@ -2237,7 +2299,7 @@ CHARLIT   (("'"\\[0-7]{1,3}"'")|("'"\\."'")|("'"[^'\\\n]{1,4}"'"))
 					    }
 					    else
 					    {
-					      //printf("Error: define %s is defined more than once!\n",g_defName.data());
+					      //printf("error: define %s is defined more than once!\n",g_defName.data());
 					    }
 					  }
 					  delete g_argDict; g_argDict=0;
@@ -2568,12 +2630,15 @@ void preprocessFile(const char *fileName,BufStr &input,BufStr &output)
 
   BEGIN( Start );
   
-  g_expectGuard = TRUE;
+  g_expectGuard = guessSection(fileName)==Entry::HEADER_SEC;
   g_lastGuardName.resize(0);
   g_guardExpr.resize(0);
   
   preYYlex();
   g_lexInit=TRUE;
+
+  // make sure we don't extend a \cond with missing \endcond over multiple files (see bug 624829)
+  forceEndCondSection();
 
   if (Debug::isFlagSet(Debug::Preprocessor))
   {

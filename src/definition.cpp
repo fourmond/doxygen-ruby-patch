@@ -252,7 +252,6 @@ void Definition::removeFromMap(Definition *d)
     DefinitionIntf *di=Doxygen::symbolMap->find(symbolName);
     if (di)
     {
-      ASSERT(di!=0);
       if (di!=d) // symbolName not unique
       {
         //printf("  removing from list: %p!\n",di);
@@ -435,6 +434,18 @@ void Definition::setDocumentation(const char *d,const char *docFile,int docLine,
 
 #define uni_isupper(c) (QChar(c).category()==QChar::Letter_Uppercase)
 
+// do a UTF-8 aware search for the last real character and return TRUE 
+// if that is a multibyte one.
+static bool lastCharIsMultibyte(const QCString &s)
+{
+  int l = s.length();
+  int p = 0;
+  int pp = -1;
+  while ((p=nextUtf8CharPosition(s,l,p))<l) pp=p;
+  if (pp==-1 || ((uchar)s[pp])<0x80) return FALSE;
+  return TRUE;
+}
+
 void Definition::_setBriefDescription(const char *b,const char *briefFile,int briefLine)
 {
   static QCString outputLanguage = Config_getEnum("OUTPUT_LANGUAGE");
@@ -447,11 +458,12 @@ void Definition::_setBriefDescription(const char *b,const char *briefFile,int br
   int bl = brief.length();
   if (bl>0 && needsDot) // add punctuation if needed
   {
-    switch(brief.at(bl-1))
+    int c = brief.at(bl-1);
+    switch(c)
     {
-      case '.': case '!': case '?': case '>': case ':': break;
+      case '.': case '!': case '?': case '>': case ':': case ')': break;
       default: 
-        if (uni_isupper(brief.at(0))) brief+='.'; 
+        if (uni_isupper(brief.at(0)) && !lastCharIsMultibyte(brief)) brief+='.'; 
         break;
     }
   }
@@ -473,6 +485,11 @@ void Definition::_setBriefDescription(const char *b,const char *briefFile,int br
     {
       m_impl->brief->file = briefFile;
       m_impl->brief->line = briefLine;
+    }
+    else
+    {
+      m_impl->brief->file = briefFile;
+      m_impl->brief->line = 1;
     }
   }
 }
@@ -782,7 +799,7 @@ void Definition::writeSourceDef(OutputList &ol,const char *)
     }
     else
     {
-      err("Error: translation error: invalid markers in trDefinedInSourceFile()\n");
+      err("error: translation error: invalid markers in trDefinedInSourceFile()\n");
     }
   }
   ol.popGeneratorState();
@@ -790,8 +807,8 @@ void Definition::writeSourceDef(OutputList &ol,const char *)
 
 void Definition::setBodySegment(int bls,int ble) 
 {
-  makeResident();
   //printf("setBodySegment(%d,%d) for %s\n",bls,ble,name().data());
+  makeResident();
   if (m_impl->body==0) m_impl->body = new BodyInfo;
   m_impl->body->startLine=bls; 
   m_impl->body->endLine=ble; 
@@ -828,7 +845,6 @@ void Definition::writeInlineCode(OutputList &ol,const char *scopeName)
       //printf("Read:\n`%s'\n\n",codeFragment.data());
       MemberDef *thisMd = 0;
       if (definitionType()==TypeMember) thisMd = (MemberDef *)this;
-      ol.startParagraph();
       ol.startCodeFragment();
       pIntf->parseCode(ol,               // codeOutIntf
                        scopeName,        // scope
@@ -843,7 +859,6 @@ void Definition::writeInlineCode(OutputList &ol,const char *scopeName)
                        FALSE             // show line numbers
                       );
       ol.endCodeFragment();
-      ol.endParagraph();
     }
   }
   ol.popGeneratorState();
@@ -1075,7 +1090,7 @@ Definition *Definition::findInnerCompound(const char *)
 
 void Definition::addInnerCompound(Definition *)
 {
-  err("Error: Definition::addInnerCompound() called\n");
+  err("error: Definition::addInnerCompound() called\n");
 }
 
 QCString Definition::qualifiedName() const
@@ -1286,6 +1301,15 @@ void Definition::writePathFragment(OutputList &ol) const
     else if (definitionType()==Definition::TypePage && !((const PageDef*)this)->title().isEmpty())
     {
       ol.writeObjectLink(getReference(),getOutputFileBase(),0,((const PageDef*)this)->title());
+    }
+    else if (definitionType()==Definition::TypeClass)
+    {
+      QCString name = m_impl->localName;
+      if (name.right(2)=="-p" || name.right(2)=="-g")
+      {
+        name = name.left(name.length()-2);
+      }
+      ol.writeObjectLink(getReference(),getOutputFileBase(),0,name);
     }
     else
     {

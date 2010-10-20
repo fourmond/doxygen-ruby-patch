@@ -43,6 +43,7 @@ documentation:
 \refitem cmdarg \\arg
 \refitem cmdattention \\attention
 \refitem cmdauthor \\author
+\refitem cmdauthors \\authors
 \refitem cmdb \\b
 \refitem cmdbrief \\brief
 \refitem cmdbug \\bug
@@ -65,6 +66,7 @@ documentation:
 \refitem cmddontinclude \\dontinclude
 \refitem cmddot \\dot
 \refitem cmddotfile \\dotfile
+\refitem cmdmscfile \\mscfile
 \refitem cmde \\e
 \refitem cmdelse \\else
 \refitem cmdelseif \\elseif
@@ -74,10 +76,12 @@ documentation:
 \refitem cmdenddot \\enddot
 \refitem cmdendhtmlonly \\endhtmlonly
 \refitem cmdendif \\endif
+\refitem cmdendinternal \\endinternal
 \refitem cmdendlatexonly \\endlatexonly
 \refitem cmdendlink \\endlink
 \refitem cmdendmanonly \\endmanonly
 \refitem cmdendmsc \\endmsc
+\refitem cmdendrtfonly \\endrtfonly
 \refitem cmdendverbatim \\endverbatim
 \refitem cmdendxmlonly \\endxmlonly
 \refitem cmdenum \\enum
@@ -136,14 +140,20 @@ documentation:
 \refitem cmdpublic \\public
 \refitem cmdpublic \\publicsection
 \refitem cmdref \\ref
+\refitem cmdrelated \\related
 \refitem cmdrelates \\relates
+\refitem cmdrelatedalso \\relatedalso
 \refitem cmdrelatesalso \\relatesalso
+\refitem cmdremark \\remark
 \refitem cmdremarks \\remarks
 \refitem cmdreturn \\return
+\refitem cmdreturns \\returns
 \refitem cmdretval \\retval
+\refitem cmdrtfonly \\rtfonly
 \refitem cmdsa \\sa
 \refitem cmdsection \\section
 \refitem cmdsee \\see
+\refitem cmdshort \\short
 \refitem cmdshowinitializer \\showinitializer
 \refitem cmdsince \\since
 \refitem cmdskip \\skip
@@ -154,6 +164,7 @@ documentation:
 \refitem cmdsubsubsection \\subsubsection
 \refitem cmdtest \\test
 \refitem cmdthrow \\throw
+\refitem cmdthrows \\throws
 \refitem cmdtodo \\todo
 \refitem cmdtparam \\tparam
 \refitem cmdtypedef \\typedef
@@ -319,7 +330,8 @@ Structural indicators
   \addindex \\dir
   Indicates that a comment block contains documentation for a directory.
   The "path fragment" argument should include the directory name and 
-  enough of the path to be unique w.r.t. the other directories in the project.
+  enough of the path to be unique with respect to the other directories 
+  in the project.
   The \ref cfg_show_dirs "SHOW_DIRECTORIES" option determines whether 
   or not the directory information is shown and the
   \ref cfg_strip_from_path "STRIP_FROM_PATH" option determines what is 
@@ -379,6 +391,15 @@ Structural indicators
   \endhtmlonly
 
   \sa section \ref cmdinclude "\\include".
+
+<hr>
+\section cmdendinternal \\endinternal
+
+  \addindex \\endinternal
+  This command ends a documentation fragment that was started with a
+  \ref cmdinternal "\\internal" command. The text between \c \\internal and 
+  \c \\endinternal will only be visible 
+  if \ref cfg_internal_docs "INTERNAL_DOCS" is set to YES.
 
 <hr>
 \section cmdextends \\extends <name>
@@ -549,18 +570,18 @@ Structural indicators
 \section cmdinternal \\internal
   
   \addindex \\internal
-  This command writes the message `For internal use only' to the output and
-  all text \e after an \c \\internal command until the end of the
-  comment block or the end of the section (whichever comes first) is 
-  marked as "internal". 
+  This command starts a documentation fragment that is meant for internal
+  use only. The fragment naturally ends at the end of the comment block. 
+  You can also force the internal section to end earlier using the 
+  \ref cmdendinternal "\\endinternal" command.
 
   If the \\internal command is put inside a section 
-  (see for example \ref cmdsection "\\section") all subsection after the 
+  (see for example \ref cmdsection "\\section") all subsections after the 
   command are considered to be internal as well. Only a new section at the 
-  same level will be visible again. 
+  same level will end the fragment that is considered internal.
 
   You can use \ref cfg_internal_docs "INTERNAL_DOCS" in the config file
-  to show or hide the internal documentation.
+  to show (\c YES) or hide (\c NO) the internal documentation.
 
 <hr>
 \section cmdmainpage \\mainpage [(title)]
@@ -624,7 +645,7 @@ Structural indicators
       \ref cmdprivate "\\private".
 
 <hr>
-\section cmdname \\name (header)  
+\section cmdname \\name [(header)]  
 
   \addindex \\name
 
@@ -817,6 +838,12 @@ Structural indicators
   \endhtmlonly
 
 <hr>
+\section cmdrelated \\related <name>
+
+  \addindex related
+  Equivalent to \ref cmdrelates "\\relates"
+
+<hr>
 \section cmdrelatesalso \\relatesalso <name>
 
   \addindex \\relatesalso
@@ -826,6 +853,12 @@ Structural indicators
   location. This command is useful for documenting 
   non-friend functions that are nevertheless strongly coupled to a certain
   class. It only works for functions.  
+
+<hr>
+\section cmdrelatedalso \\relatedalso <name>
+
+  \addindex relatedalso
+  Equivalent to \ref cmdrelatesalso "\\relatesalso"
 
 <hr>
 \section cmdshowinitializer \\showinitializer
@@ -928,6 +961,11 @@ Section indicators
   Click <a href="$(DOXYGEN_DOCDIR)/examples/author/html/class_windows_n_t.html">here</a> 
   for the corresponding HTML documentation that is generated by doxygen.
   \endhtmlonly
+<hr>
+\section cmdauthors \\authors { list of authors }
+
+  \addindex \\authors
+  Equivalent to \ref cmdauthor "\\author".
 
 <hr>
 \section cmdbrief \\brief {brief description}
@@ -944,7 +982,7 @@ Section indicators
   \ref cmdauthor "\\author" for an example. 
 
   Synonymous to \\short.
- 
+
 <hr>
 \section cmdbug \\bug { bug description }
 
@@ -1278,6 +1316,14 @@ void memcpy(void *dest, const void *src, size_t n);
   sectioning command is encountered. See section \ref cmdfn "\\fn" for an 
   example.
 
+  Note that for PHP one can also specify the type (or types if you
+  separate them with a pipe symbol) which are allowed for a parameter 
+  (as this is not part of the definition).
+  The syntax is the same as for phpDocumentor, i.e.
+\verbatim
+@param  datatype1|datatype2 $paramname description
+\endverbatim
+
 <hr>
 \section cmdtparam \\tparam <template-parameter-name> { description }
 
@@ -1317,9 +1363,9 @@ void memcpy(void *dest, const void *src, size_t n);
   sectioning command is encountered.
   
 <hr>
-\section cmdremarks \\remarks { remark text }
+\section cmdremark \\remark { remark text }
 
-  \addindex \\remarks
+  \addindex \\remark
   Starts a paragraph where one or more remarks may be entered. 
   The paragraph will be indented. 
   The text of the paragraph has no special internal structure. All visual
@@ -1329,6 +1375,12 @@ void memcpy(void *dest, const void *src, size_t n);
   Alternatively, one \\remark command may mention 
   several remarks. The \\remark command ends when a blank line or some other 
   sectioning command is encountered. 
+
+<hr>
+\section cmdremarks \\remarks { remark text }
+
+  \addindex \\remarks
+  Equivalent to \ref cmdremark "\\remark".
 
 <hr>
 \section cmdreturn \\return { description of the return value }
@@ -1341,12 +1393,18 @@ void memcpy(void *dest, const void *src, size_t n);
   The \\return description ends when a blank line or some other 
   sectioning command is encountered. See section \ref cmdfn "\\fn" for an 
   example.
+
+<hr>
+\section cmdreturns \\returns { description of the return value }
+
+  \addindex \\returns
+  Equivalent to \ref cmdreturn "\\return".
   
 <hr>
 \section cmdretval \\retval <return value> { description }
 
   \addindex \\retval
-  Starts a return value description for a function with name 
+  Starts a description for a function's return value with name 
   \<return value\>. Followed by a description of the return value. 
   The text of the paragraph that forms the description has no special
   internal structure. All visual enhancement commands may be used inside the 
@@ -1380,6 +1438,12 @@ void memcpy(void *dest, const void *src, size_t n);
   Equivalent to \ref cmdsa "\\sa". Introduced for compatibility with Javadoc.
 
 <hr>
+\section cmdshort \\short {short description}
+
+  \addindex \\short
+  Equivalent to \\ref cmdbrief "\\brief".
+ 
+<hr>
 \section cmdsince \\since { text }
 
   \addindex \\since
@@ -1407,6 +1471,12 @@ void memcpy(void *dest, const void *src, size_t n);
 
   \par Note: 
   the tag \\throws is a synonym for this tag.
+
+<hr>
+\section cmdthrows \\throws <exception-object> { exception description }
+
+  \addindex \\throws
+  Equivalent to \ref cmdthrows "\\throws".
 
 <hr>
 \section cmdtodo \\todo { paragraph describing what is to be done }
@@ -2036,7 +2106,7 @@ class C {};
 Here is an example of the use of the \\msc command.
 \code
 /** Sender class. Can be used to send a command to the server.
- *  The receiver will acknowlegde the command by calling Ack().
+ *  The receiver will acknowledge the command by calling Ack().
  *  \msc
  *    Sender,Receiver;
  *    Sender->Receiver [label="Command()", URL="\ref Receiver::Command()"];
@@ -2077,6 +2147,24 @@ class Receiver
   doxygen will look for files in the paths (or files) that you specified 
   after the \ref cfg_dotfile_dirs "DOTFILE_DIRS" tag. 
   If the dot file is found it will be used as an input file to the dot tool. 
+  The resulting image will be put into the correct output directory.
+  If the dot file name contains spaces you'll have to put quotes ("...") around it.
+
+  The second argument is optional and can be used to specify the caption
+  that is displayed below the image. This argument has to be specified
+  between quotes even if it does not contain any spaces. The quotes are
+  stripped before the caption is displayed.
+
+<hr>
+\section cmdmscfile \\mscfile <file> ["caption"] 
+
+  \addindex \\mscfile
+  Inserts an image generated by mscgen from \<file\> into the documentation. 
+
+  The first argument specifies the file name of the image. 
+  doxygen will look for files in the paths (or files) that you specified 
+  after the \ref cfg_mscfile_dirs "MSCFILE_DIRS" tag. 
+  If the msc file is found it will be used as an input file to the mscgen tool. 
   The resulting image will be put into the correct output directory.
   If the dot file name contains spaces you'll have to put quotes ("...") around it.
 
@@ -2164,12 +2252,21 @@ class Receiver
   \sa section \ref cmdmanonly "\\manonly".
 
 <hr>
+\section cmdendrtfonly \\endrtfonly
+
+  \addindex \\endrtfonly
+  Ends a block of text that was started with a \\rtfonly command.
+
+  \sa section \ref cmdrtfonly "\\rtfonly".
+
+
+<hr>
 \section cmdendverbatim \\endverbatim
 
   \addindex \\endverbatim
   Ends a block of text that was started with a \\verbatim command.
   
-  \sa section \ref cmdendcode "\\endcode", section \ref cmdverbatim "\\verbatim".
+  \sa section \ref cmdverbatim "\\verbatim".
 
 <hr>
 \section cmdendxmlonly \\endxmlonly
@@ -2224,7 +2321,7 @@ class Receiver
   \addindex \\htmlonly
   Starts a block of text that will be verbatim included in the
   generated HTML documentation only. The block ends with a
-  endhtmlonly command.
+  \ref cmdhtmlonly "\\endhtmlonly" command.
 
   This command can be used to include HTML code that is too complex
   for doxygen (i.e. applets, java-scripts, and HTML tags that
@@ -2235,8 +2332,9 @@ class Receiver
     environment variables (like \$(HOME) ) are resolved inside a 
     HTML-only block.
 
-  \sa section \ref cmdmanonly "\\manonly" and section 
-              \ref cmdlatexonly "\\latexonly".
+  \sa section \ref cmdmanonly "\\manonly", section 
+              \ref cmdlatexonly "\\latexonly", and section
+              \ref cmdrtfonly "\\rtfonly".
 
 <hr>
 \section cmdimage \\image <format> <file> ["caption"] [<sizeindication>=<size>]
@@ -2255,7 +2353,7 @@ class Receiver
   If the image is found it will be copied to the correct output directory.
   If the image name contains spaces you'll have to put quotes ("...") around it.
   You can also specify an absolute URL instead of a file name, but then
-  doxygen does not copy the image nor check its existance.
+  doxygen does not copy the image nor check its existence.
 
   The third argument is optional and can be used to specify the caption
   that is displayed below the image. This argument has to be specified
@@ -2299,7 +2397,7 @@ class Receiver
   \addindex \\latexonly
   Starts a block of text that will be verbatim included in the
   generated \f$\mbox{\LaTeX}\f$ documentation only. The block ends with a
-  endlatexonly command.
+  \ref cmdendlatexonly "\\endlatexonly" command.
 
   This command can be used to include \f$\mbox{\LaTeX}\f$ code that is too 
   complex for doxygen (i.e. images, formulas, special characters). You can 
@@ -2310,8 +2408,9 @@ class Receiver
     environment variables (like \$(HOME) ) are resolved inside a 
     \f$\mbox{\LaTeX}\f$-only block.
 
-  \sa section \ref cmdlatexonly "\\latexonly" 
-  and section \ref cmdhtmlonly "\\htmlonly".
+  \sa section \ref cmdrtfonly "\\rtfonly",
+      section \ref cmdmanonly "\\manonly", and
+      section \ref cmdhtmlonly "\\htmlonly".
 
 <hr>
 \section cmdmanonly \\manonly
@@ -2319,15 +2418,16 @@ class Receiver
   \addindex \\manonly
   Starts a block of text that will be verbatim included in the
   generated MAN documentation only. The block ends with a
-  endmanonly command.
+  \ref cmdendmanonly "\\endmanonly" command.
 
   This command can be used to include groff code directly into
   MAN pages. You can use the \\htmlonly and \\latexonly and 
   \\endhtmlonly and \\endlatexonly pairs to provide proper 
   HTML and \f$\mbox{\LaTeX}\f$ alternatives.
 
-  \sa section \ref cmdhtmlonly "\\htmlonly" and section 
-              \ref cmdlatexonly "\\latexonly".
+  \sa section \ref cmdhtmlonly "\\htmlonly", 
+      section \ref cmdrtfonly "\\rtfonly", and
+      section \ref cmdlatexonly "\\latexonly".
 
 <hr>
 \section cmdli \\li { item-description }
@@ -2386,18 +2486,38 @@ class Receiver
   Equivalent to \ref cmdc "\\c"
  
 <hr>
+\section cmdrtfonly \\rtfonly
+
+  \addindex \\rtfonly
+  Starts a block of text that will be verbatim included in the
+  generated RTF documentation only. The block ends with a
+  \ref cmdendrtfonly "\\endrtfonly" command.
+
+  This command can be used to include RTF code that is too complex
+  for doxygen. 
+
+  \b Note:
+    environment variables (like \$(HOME) ) are resolved inside a 
+    RTF-only block.
+
+  \sa section \ref cmdmanonly "\\manonly", section 
+              \ref cmdlatexonly "\\latexonly", and section
+              \ref cmdhtmlonly "\\htmlonly".
+
+<hr>
 \section cmdverbatim \\verbatim
 
   \addindex \\verbatim
-  Starts a block of text that will be verbatim included in both the
-  HTML and the 
-  \f$\mbox{\LaTeX}\f$ documentation. The block should end with a 
-  \\endverbatim block. All commands are disabled in a verbatim block.
+  Starts a block of text that will be verbatim included in 
+  the documentation. The block should end with a 
+  \ref cmdendverbatim "\\endverbatim" block. 
+  All commands are disabled in a verbatim block.
 
   \warning Make sure you include a \\endverbatim command for each 
   \\verbatim command or the parser will get confused!
 
-  \sa section \ref cmdcode "\\code", and section \ref cmdverbinclude "\\verbinclude".
+  \sa section \ref cmdcode "\\code", and 
+      section \ref cmdverbinclude "\\verbinclude".
 
 <hr>
 \section cmdxmlonly \\xmlonly
@@ -2416,16 +2536,16 @@ class Receiver
 \section cmdbackslash \\\\
 
   \addindex \\\\
-  This command writes a backslash character (\\) to the HTML and 
-  \f$\mbox{\LaTeX}\f$ output. The backslash has to be escaped in some 
+  This command writes a backslash character (\\) to the 
+  output. The backslash has to be escaped in some 
   cases because doxygen uses it to detect commands.
 
 <hr>
 \section cmdat \\\@
 
   \addindex \\\@
-  This command writes an at-sign (\@) to the HTML and 
-  \f$\mbox{\LaTeX}\f$ output. The at-sign has to be escaped in some cases 
+  This command writes an at-sign (\@) to the output. 
+  The at-sign has to be escaped in some cases 
   because doxygen uses it to detect JavaDoc commands.
 
 <hr>
@@ -2496,7 +2616,7 @@ class Receiver
   \addindex \\\"
   This command writes the \" character to the output. This 
   character has to be escaped in some cases, because it is used in pairs
-  to indicate an unformated text fragment.
+  to indicate an unformatted text fragment.
 
 <hr>
 \htmlonly <center> \endhtmlonly 

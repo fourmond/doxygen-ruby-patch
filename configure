@@ -17,7 +17,7 @@
 
 doxygen_version_major=1
 doxygen_version_minor=7
-doxygen_version_revision=0
+doxygen_version_revision=2
 
 #NOTE: Setting version_mmn to "NO" will omit mmn info from the package.
 doxygen_version_mmn=NO
@@ -38,7 +38,7 @@ f_app=NO
 f_thread=NO
 f_flex=NO
 f_bison=NO
-f_langs=nl,sv,cz,fr,id,it,de,jp,je,es,fi,ru,hr,pl,pt,hu,kr,ke,ro,si,cn,no,br,dk,sk,ua,gr,tw,sr,ca,lt,za,ar,fa,vi,tr,eo
+f_langs=nl,sv,cz,fr,id,it,de,jp,je,es,fi,ru,hr,pl,pt,hu,kr,ke,ro,si,cn,no,mk,br,dk,sk,ua,gr,tw,sr,ca,lt,za,ar,fa,sc,vi,tr,eo
 
 while test -n "$1";  do
   case $1 in
@@ -268,7 +268,7 @@ if test "$f_wizard" = YES; then
   if test -z "$QTDIR"; then
     echo "  QTDIR environment variable not set!"
     echo -n "  Checking for Qt..."
-    for d in /usr /usr/{lib,share,qt}/{qt-4,qt4,qt,qt*,4}; do
+    for d in /usr/{lib,share,qt}/{qt-4,qt4,qt,qt*,4} /usr; do
       if test -x "$d/bin/qmake"; then
         QTDIR=$d
       fi

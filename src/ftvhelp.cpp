@@ -509,7 +509,7 @@ void FTVHelp::generateLink(FTextStream &t,FTVNode *n)
     t << "</a>";
     if (!n->ref.isEmpty())
     {
-      t << "&nbsp;[external]";
+      t << "&#160;[external]";
     }
   }
 }
@@ -561,7 +561,7 @@ void FTVHelp::generateTreeViewImages()
     }
     else
     {
-      fprintf(stderr,"Warning: Cannot open file %s for writing\n",fileName.data());
+      fprintf(stderr,"warning: Cannot open file %s for writing\n",fileName.data());
     }
     f.close();
     p++;

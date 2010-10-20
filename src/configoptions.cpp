@@ -208,7 +208,7 @@ void addConfigOptions(Config *cfg)
   cb = cfg->addBool(
                  "SHORT_NAMES",
                  "If the SHORT_NAMES tag is set to YES, doxygen will generate much shorter\n"
-                 "(but less readable) file names. This can be useful is your file systems\n"
+                 "(but less readable) file names. This can be useful if your file system\n"
                  "doesn't support long names like on DOS, Mac, or CD-ROM.",
                  FALSE
                 );
@@ -335,7 +335,7 @@ void addConfigOptions(Config *cfg)
                  "to include (a tag file for) the STL sources as input, then you should\n"
                  "set this tag to YES in order to let doxygen match functions declarations and\n"
                  "definitions whose arguments contain STL classes (e.g. func(std::string); v.s.\n"
-                 "func(std::string) {}). This also make the inheritance and collaboration\n"
+                 "func(std::string) {}). This also makes the inheritance and collaboration\n"
                  "diagrams that involve STL classes more complete and accurate.",
                  FALSE
                 );
@@ -359,7 +359,7 @@ void addConfigOptions(Config *cfg)
                  "IDL_PROPERTY_SUPPORT",
                  "For Microsoft's IDL there are propget and propput attributes to indicate getter\n"
                  "and setter methods for a property. Setting this option to YES (the default)\n"
-                 "will make doxygen to replace the get and set methods by a property in the\n"
+                 "will make doxygen replace the get and set methods by a property in the\n"
                  "documentation. This will only work if the methods are indeed getting or\n"
                  "setting a simple type. If this is not the case, or you want to show the\n"
                  "methods anyway, you should set this option to NO.",
@@ -408,7 +408,7 @@ void addConfigOptions(Config *cfg)
                  "causing a significant performance penality.\n"
                  "If the system has enough physical memory increasing the cache will improve the\n"
                  "performance by keeping more symbols in memory. Note that the value works on\n"
-                 "a logarithmic scale so increasing the size by one will rougly double the\n"
+                 "a logarithmic scale so increasing the size by one will roughly double the\n"
                  "memory usage. The cache size is given by this formula:\n"
                  "2^(16+SYMBOL_CACHE_SIZE). The valid range is 0..9, the default is 0,\n"
                  "corresponding to a cache size of 2^16 = 65536 symbols",
@@ -465,7 +465,7 @@ void addConfigOptions(Config *cfg)
                  "extracted and appear in the documentation as a namespace called\n"
                  "'anonymous_namespace{file}', where file will be replaced with the base\n"
                  "name of the file that contains the anonymous namespace. By default\n"
-                 "anonymous namespace are hidden.",
+                 "anonymous namespaces are hidden.",
                  FALSE
                 );
   //----
@@ -647,10 +647,10 @@ void addConfigOptions(Config *cfg)
   ci = cfg->addInt(
                  "MAX_INITIALIZER_LINES",
                  "The MAX_INITIALIZER_LINES tag determines the maximum number of lines\n"
-                 "the initial value of a variable or define consists of for it to appear in\n"
+                 "the initial value of a variable or macro consists of for it to appear in\n"
                  "the documentation. If the initializer consists of more lines than specified\n"
                  "here it will be hidden. Use a value of 0 to hide initializers completely.\n"
-                 "The appearance of the initializer of individual variables and defines in the\n"
+                 "The appearance of the initializer of individual variables and macros in the\n"
                  "documentation can be controlled using \\showinitializer or \\hideinitializer\n"
                  "command in the documentation regardless of this setting.",
                  0,10000,30
@@ -750,7 +750,7 @@ void addConfigOptions(Config *cfg)
   //----
   cb = cfg->addBool(
                  "WARN_NO_PARAMDOC",
-                 "This WARN_NO_PARAMDOC option can be abled to get warnings for\n"
+                 "The WARN_NO_PARAMDOC option can be enabled to get warnings for\n"
                  "functions that are documented, but have no documentation for their parameters\n"
                  "or return value. If set to NO (the default) doxygen will only warn about\n"
                  "wrong or incomplete parameter documentation, but not about the absence of\n"
@@ -807,8 +807,9 @@ void addConfigOptions(Config *cfg)
                  "FILE_PATTERNS tag to specify one or more wildcard pattern (like *.cpp\n"
                  "and *.h) to filter out the source-files in the directories. If left\n"
                  "blank the following patterns are tested:\n"
-                 "*.c *.cc *.cxx *.cpp *.c++ *.java *.ii *.ixx *.ipp *.i++ *.inl *.h *.hh *.hxx\n"
-                 "*.hpp *.h++ *.idl *.odl *.cs *.php *.php3 *.inc *.m *.mm *.py *.f90"
+                 "*.c *.cc *.cxx *.cpp *.c++ *.d *.java *.ii *.ixx *.ipp *.i++ *.inl *.h *.hh\n"
+                 "*.hxx *.hpp *.h++ *.idl *.odl *.cs *.php *.php3 *.inc *.m *.mm *.dox *.py\n"
+                 "*.f90 *.f *.vhd *.vhdl"
                 );
   cl->addValue("*.c");
   cl->addValue("*.cc");
@@ -1399,9 +1400,10 @@ void addConfigOptions(Config *cfg)
   //----
   ci = cfg->addInt(
                  "ENUM_VALUES_PER_LINE",
-                 "This tag can be used to set the number of enum values (range [1..20])\n"
-                 "that doxygen will group on one line in the generated HTML documentation.",
-                 1,20,4
+                 "This tag can be used to set the number of enum values (range [0,1..20])\n"
+                 "that doxygen will group on one line in the generated HTML documentation.\n"
+                 "Note that a value of 0 will completely suppress the enum values from appearing in the overview section.",
+                 0,20,4
                 );
   ci->addDependency("GENERATE_HTML");
   //----
@@ -1455,6 +1457,40 @@ void addConfigOptions(Config *cfg)
   ci->addDependency("GENERATE_HTML");
   //----
   cb = cfg->addBool(
+                 "FORMULA_TRANSPARENT",
+                 "Use the FORMULA_TRANPARENT tag to determine whether or not the images\n"
+                 "generated for formulas are transparent PNGs. Transparent PNGs are\n"
+                 "not supported properly for IE 6.0, but are supported on all modern browsers.\n"
+                 "Note that when changing this option you need to delete any form_*.png files\n"
+                 "in the HTML output before the changes have effect.",
+                 TRUE
+                );
+  cb->addDependency("GENERATE_HTML");
+  //----
+  cb = cfg->addBool(
+                 "USE_MATHJAX",
+                 "Enable the USE_MATHJAX option to render LaTeX formulas using MathJax\n"
+                 "(see http://www.mathjax.org) which uses client side Javascript for the\n"
+                 "rendering instead of using prerendered bitmaps. Use this if you do not\n"
+                 "have LaTeX installed or if you want to formulas look prettier in the HTML\n"
+                 "output. When enabled you also need to install MathJax separately and\n"
+                 "configure the path to it using the MATHJAX_RELPATH option.",
+                 FALSE
+                );
+  //----
+  cs = cfg->addString(
+                 "MATHJAX_RELPATH",
+                 "When MathJax is enabled you need to specify the location relative to the\n"
+                 "HTML output directory using the MATHJAX_RELPATH option. The destination\n"
+                 "directory should contain the MathJax.js script. For instance, if the mathjax\n"
+                 "directory is located at the same level as the HTML output directory, then\n"
+                 "MATHJAX_RELPATH should be ../mathjax. The default value points to the mathjax.org site, so you can quickly see the result without installing\n"
+                 "MathJax, but it is strongly recommended to install a local copy of MathJax\n"
+                 "before deployment."
+                );
+  cs->setDefaultValue("http://www.mathjax.org/mathjax");
+  //----
+  cb = cfg->addBool(
                  "SEARCHENGINE",
                  "When the SEARCHENGINE tag is enabled doxygen will generate a search box\n"
                  "for the HTML output. The underlying search engine uses javascript\n"
@@ -1474,7 +1510,7 @@ void addConfigOptions(Config *cfg)
                  "using Javascript. Doxygen will generate the search PHP script and index\n"
                  "file to put on the web server. The advantage of the server\n"
                  "based approach is that it scales better to large projects and allows\n"
-                 "full text search. The disadvances is that it is more difficult to setup\n"
+                 "full text search. The disadvantages are that it is more difficult to setup\n"
                  "and does not have live searching capabilities.",
                  FALSE
                 );
@@ -1535,9 +1571,9 @@ void addConfigOptions(Config *cfg)
   ce = cfg->addEnum(
                  "PAPER_TYPE",
                  "The PAPER_TYPE tag can be used to set the paper type that is used\n"
-                 "by the printer. Possible values are: a4, a4wide, letter, legal and\n"
+                 "by the printer. Possible values are: a4, letter, legal and\n"
                  "executive. If left blank a4wide will be used.",
-                 "a4wide"
+                 "a4"
                 );
   ce->addValue("a4");
   ce->addValue("a4wide");
@@ -1972,9 +2008,8 @@ void addConfigOptions(Config *cfg)
                  "If the CLASS_DIAGRAMS tag is set to YES (the default) Doxygen will\n"
                  "generate a inheritance diagram (in HTML, RTF and LaTeX) for classes with base\n"
                  "or super classes. Setting the tag to NO turns the diagrams off. Note that\n"
-                 "this option is superseded by the HAVE_DOT option below. This is only a\n"
-                 "fallback. It is recommended to install and use dot, since it yields more\n"
-                 "powerful graphs.",
+                 "this option also works with HAVE_DOT disabled, but it is recommended to\n"
+                 "install and use dot, since it yields more powerful graphs.",
                  TRUE
                 );
   //----
@@ -2136,7 +2171,7 @@ void addConfigOptions(Config *cfg)
   cb = cfg->addBool(
                  "GRAPHICAL_HIERARCHY",
                  "If the GRAPHICAL_HIERARCHY and HAVE_DOT tags are set to YES then doxygen\n"
-                 "will graphical hierarchy of all classes instead of a textual one.",
+                 "will generate a graphical hierarchy of all classes instead of a textual one.",
                  TRUE
                 );
   cb->addDependency("HAVE_DOT");
@@ -2154,7 +2189,7 @@ void addConfigOptions(Config *cfg)
   ce = cfg->addEnum(
                  "DOT_IMAGE_FORMAT",
                  "The DOT_IMAGE_FORMAT tag can be used to set the image format of the images\n"
-                 "generated by dot. Possible values are png, jpg, or gif\n"
+                 "generated by dot. Possible values are png, jpg, or gif.\n"
                  "If left blank png will be used.",
                  "png"
                 );
@@ -2178,6 +2213,14 @@ void addConfigOptions(Config *cfg)
                  "\\dotfile command)."
                 );
   cl->addDependency("HAVE_DOT");
+  cl->setWidgetType(ConfigList::Dir);
+  //----
+  cl = cfg->addList(
+                 "MSCFILE_DIRS",
+                 "The MSCFILE_DIRS tag can be used to specify one or more directories that\n"
+                 "contain msc files that are included in the documentation (see the\n"
+                 "\\mscfile command)."
+                );
   cl->setWidgetType(ConfigList::Dir);
   //----
   ci = cfg->addInt(

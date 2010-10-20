@@ -277,7 +277,7 @@ static bool writeDefArgumentList(OutputList &ol,ClassDef *cd,
   ol.pushGeneratorState();
   ol.disable(OutputGenerator::Html);
   ol.disable(OutputGenerator::Latex);
-  //if (!first) ol.writeString("&nbsp;");
+  //if (!first) ol.writeString("&#160;");
   if (!md->isObjCMethod()) ol.docify(")"); // end argument list
   ol.enableAll();
   if (htmlOn) ol.enable(OutputGenerator::Html);
@@ -791,8 +791,8 @@ QCString MemberDef::getOutputFileBase() const
   if (baseName.isEmpty())
   {
     warn(getDefFileName(),getDefLine(),
-       "Warning: Internal inconsistency: member %s does not belong to any"
-       " container!",name().data()
+       "warning: Internal inconsistency: member %s does not belong to any"
+       " container!",qPrint(name())
       );
     return "dummy";
   }
@@ -2225,7 +2225,7 @@ void MemberDef::writeDocumentation(MemberList *ml,OutputList &ol,
       }
       else
       {
-        err("Error: translation error: no marker in trReimplementsFromList()\n");
+        err("error: translation error: no marker in trReimplementsFromList()\n");
       }
       ol.endParagraph();
     }
@@ -2334,7 +2334,7 @@ void MemberDef::writeDocumentation(MemberList *ml,OutputList &ol,
     DotCallGraph callGraph(this,FALSE);
     if (!callGraph.isTrivial() && !callGraph.isTooBig())
     {
-      msg("Generating call graph for function %s\n",qualifiedName().data());
+      msg("Generating call graph for function %s\n",qPrint(qualifiedName()));
       ol.disable(OutputGenerator::Man);
       ol.startParagraph();
       ol.startCallGraph();
@@ -2351,7 +2351,7 @@ void MemberDef::writeDocumentation(MemberList *ml,OutputList &ol,
     DotCallGraph callerGraph(this, TRUE);
     if (!callerGraph.isTrivial() && !callerGraph.isTooBig())
     {
-      msg("Generating caller graph for function %s\n",qualifiedName().data());
+      msg("Generating caller graph for function %s\n",qPrint(qualifiedName()));
       ol.disable(OutputGenerator::Man);
       ol.startParagraph();
       ol.startCallGraph();
@@ -2389,14 +2389,14 @@ void MemberDef::writeDocumentation(MemberList *ml,OutputList &ol,
     if (!hasDocumentedParams())
     {
       warn_doc_error(docFile(),docLine(),
-          "Warning: parameters of member %s are not (all) documented",
-          qualifiedName().data());
+          "warning: parameters of member %s are not (all) documented",
+          qPrint(qualifiedName()));
     }
-    if (!hasDocumentedReturnType())
+    if (!hasDocumentedReturnType() && isFunction() && hasDocumentation())
     {
       warn_doc_error(docFile(),docLine(),
-          "Warning: return type of member %s is not documented",
-          qualifiedName().data());
+          "warning: return type of member %s is not documented",
+          qPrint(qualifiedName()));
     }
   }
 
@@ -2453,8 +2453,8 @@ void MemberDef::warnIfUndocumented()
       (m_impl->prot!=Private || Config_getBool("EXTRACT_PRIVATE"))
      )
   {
-    warn_undoc(getDefFileName(),getDefLine(),"Warning: Member %s%s (%s) of %s %s is not documented.",
-         name().data(),argsString()?argsString():"",memberTypeName().data(),t,d->name().data());
+    warn_undoc(getDefFileName(),getDefLine(),"warning: Member %s%s (%s) of %s %s is not documented.",
+         qPrint(name()),qPrint(argsString()),qPrint(memberTypeName()),t,qPrint(d->name()));
   }
 }
 
@@ -2692,7 +2692,7 @@ void MemberDef::addListReference(Definition *)
 {
   makeResident();
   static bool optimizeOutputForC = Config_getBool("OPTIMIZE_OUTPUT_FOR_C");
-  static bool hideScopeNames     = Config_getBool("HIDE_SCOPE_NAMES");
+  //static bool hideScopeNames     = Config_getBool("HIDE_SCOPE_NAMES");
   static bool optimizeOutputJava = Config_getBool("OPTIMIZE_OUTPUT_JAVA");
   static bool fortranOpt = Config_getBool("OPTIMIZE_FOR_FORTRAN");  
   visited=TRUE;
@@ -2712,6 +2712,9 @@ void MemberDef::addListReference(Definition *)
   }
   QCString memName = name();
   Definition *pd=getOuterScope();
+  QCString pdName = pd->definitionType()==Definition::TypeClass ? 
+                    ((ClassDef*)pd)->displayName() : pd->name();
+  QCString sep = optimizeOutputJava ? "." : "::";
   QCString memArgs;
   if (!isRelated() 
       /* && commented out as a result of bug 597016
@@ -2729,14 +2732,9 @@ void MemberDef::addListReference(Definition *)
     {
       memName = "[" + pd->name() + " " + name() + "]";
     }
-    else if (optimizeOutputJava)
+    else 
     {
-      if (!hideScopeNames && pd!=Doxygen::globalScope) memName.prepend(pd->name()+".");
-      memArgs = argsString();
-    }
-    else
-    {
-      if (!hideScopeNames && pd!=Doxygen::globalScope) memName.prepend(pd->name()+"::");
+      if (pd!=Doxygen::globalScope) memName.prepend(pdName+sep);
       memArgs = argsString();
     }
   }
@@ -2776,8 +2774,8 @@ Specifier MemberDef::virtualness(int count) const
   if (count>25) 
   {
      warn(getDefFileName(),getDefLine(),
-       "Warning: Internal inconsistency: recursion detected in overload relation for member %s!"
-       ,name().data()
+       "warning: Internal inconsistency: recursion detected in overload relation for member %s!"
+       ,qPrint(name())
       );
      return Normal;
   }
@@ -2807,6 +2805,13 @@ void MemberDef::_computeIsConstructor()
              getLanguageFromFileName(m_impl->fileDef->name())==SrcLangExt_PHP)
     {                // for PHP
       m_isConstructorCached = name()=="__construct" ? 2 : 1;
+      return;
+    }
+    else if (name()=="__init__" && m_impl->fileDef &&
+             getLanguageFromFileName(m_impl->fileDef->name())==SrcLangExt_Python) 
+               // for Python
+    {
+      m_isConstructorCached=2; // TRUE
       return;
     }
     else // for other languages
@@ -2850,6 +2855,12 @@ void MemberDef::_computeIsDestructor()
       getLanguageFromFileName(m_impl->fileDef->name())==SrcLangExt_PHP)
   {                // for PHP
     isDestructor = name()=="__destruct";
+  }
+  else if (name()=="__del__" && m_impl->fileDef &&
+           getLanguageFromFileName(m_impl->fileDef->name())==SrcLangExt_Python) 
+               // for Python
+  {
+    isDestructor=TRUE;
   }
   else // other languages
   {
@@ -2922,10 +2933,9 @@ void MemberDef::writeEnumDeclaration(OutputList &typeDecl,
     typeDecl.writeChar(' ');
   }
 
-  if (numVisibleEnumValues>0)
+  uint enumValuesPerLine = (uint)Config_getInt("ENUM_VALUES_PER_LINE");
+  if (numVisibleEnumValues>0 && enumValuesPerLine>0)
   {
-    uint enumValuesPerLine = (uint)Config_getInt("ENUM_VALUES_PER_LINE");
-    if (enumValuesPerLine==0) enumValuesPerLine=1;
     typeDecl.docify("{ ");
     if (fmdl)
     {
@@ -2945,7 +2955,7 @@ void MemberDef::writeEnumDeclaration(OutputList &typeDecl,
             typeDecl.enable(OutputGenerator::Latex);
             typeDecl.lineBreak(); 
             typeDecl.disable(OutputGenerator::Latex);
-            typeDecl.writeString("&nbsp;&nbsp;");
+            typeDecl.writeString("&#160;&#160;");
             typeDecl.popGeneratorState();
           }
 

@@ -156,7 +156,6 @@ static void writeMapArea(FTextStream &t,ClassDef *cd,QCString relPath,
 {
   if (cd->isLinkable())
   {
-    QCString *dest;
     QCString ref=cd->getReference();
     t << "<area ";
     if (!ref.isEmpty()) 
@@ -350,7 +349,7 @@ bool TreeDiagram::layoutTree(DiagramItem *root,int r)
     DiagramItem *di=dil->first();
     while (di && !moved && !di->isInList())
     {
-      moved = moved || layoutTree(di,r+1);
+      moved = layoutTree(di,r+1);
       di=dil->next();
     }
   }
@@ -1247,7 +1246,7 @@ void ClassDiagram::writeFigure(FTextStream &output,const char *path,
     portable_sysTimerStart();
     if (portable_system("epstopdf",epstopdfArgs)!=0)
     {
-       err("Error: Problems running epstopdf. Check your TeX installation!\n");
+       err("error: Problems running epstopdf. Check your TeX installation!\n");
        portable_sysTimerStop();
        return;
     }

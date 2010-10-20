@@ -152,7 +152,7 @@ are normally passed to the compiler using the -I flag.
     </option>
     <option type='bool' id='SHORT_NAMES' docs='
 If the SHORT_NAMES tag is set to YES, doxygen will generate much shorter 
-(but less readable) file names. This can be useful is your file systems 
+(but less readable) file names. This can be useful if your file system 
 doesn&apos;t support long names like on DOS, Mac, or CD-ROM. 
 ' defval='0'/>
     <option type='bool' id='JAVADOC_AUTOBRIEF' docs='
@@ -245,7 +245,7 @@ If you use STL classes (i.e. std::string, std::vector, etc.) but do not want
 to include (a tag file for) the STL sources as input, then you should 
 set this tag to YES in order to let doxygen match functions declarations and 
 definitions whose arguments contain STL classes (e.g. func(std::string); v.s. 
-func(std::string) {}). This also make the inheritance and collaboration 
+func(std::string) {}). This also makes the inheritance and collaboration 
 diagrams that involve STL classes more complete and accurate. 
 ' defval='0'/>
     <option type='bool' id='CPP_CLI_SUPPORT' docs='
@@ -260,7 +260,7 @@ instead of private inheritance when no explicit protection keyword is present.
     <option type='bool' id='IDL_PROPERTY_SUPPORT' docs='
 For Microsoft&apos;s IDL there are propget and propput attributes to indicate getter 
 and setter methods for a property. Setting this option to YES (the default) 
-will make doxygen to replace the get and set methods by a property in the 
+will make doxygen replace the get and set methods by a property in the 
 documentation. This will only work if the methods are indeed getting or 
 setting a simple type. If this is not the case, or you want to show the 
 methods anyway, you should set this option to NO. 
@@ -297,7 +297,7 @@ doxygen to be busy swapping symbols to and from disk most of the time
 causing a significant performance penality. 
 If the system has enough physical memory increasing the cache will improve the 
 performance by keeping more symbols in memory. Note that the value works on 
-a logarithmic scale so increasing the size by one will rougly double the 
+a logarithmic scale so increasing the size by one will roughly double the 
 memory usage. The cache size is given by this formula: 
 2^(16+SYMBOL_CACHE_SIZE). The valid range is 0..9, the default is 0, 
 corresponding to a cache size of 2^16 = 65536 symbols 
@@ -334,7 +334,7 @@ If this flag is set to YES, the members of anonymous namespaces will be
 extracted and appear in the documentation as a namespace called 
 &apos;anonymous_namespace{file}&apos;, where file will be replaced with the base 
 name of the file that contains the anonymous namespace. By default 
-anonymous namespace are hidden. 
+anonymous namespaces are hidden. 
 ' defval='0'/>
     <option type='bool' id='HIDE_UNDOC_MEMBERS' docs='
 If the HIDE_UNDOC_MEMBERS tag is set to YES, Doxygen will hide all 
@@ -454,10 +454,10 @@ documentation sections, marked by \if sectionname ... \endif.
     </option>
     <option type='int' id='MAX_INITIALIZER_LINES' docs='
 The MAX_INITIALIZER_LINES tag determines the maximum number of lines 
-the initial value of a variable or define consists of for it to appear in 
+the initial value of a variable or macro consists of for it to appear in 
 the documentation. If the initializer consists of more lines than specified 
 here it will be hidden. Use a value of 0 to hide initializers completely. 
-The appearance of the initializer of individual variables and defines in the 
+The appearance of the initializer of individual variables and macros in the 
 documentation can be controlled using \showinitializer or \hideinitializer 
 command in the documentation regardless of this setting. 
 ' minval='0' maxval='10000' defval='30'/>
@@ -521,7 +521,7 @@ parameters in a documented function, or documenting parameters that
 don&apos;t exist or using markup commands wrongly. 
 ' defval='1'/>
     <option type='bool' id='WARN_NO_PARAMDOC' docs='
-This WARN_NO_PARAMDOC option can be abled to get warnings for 
+The WARN_NO_PARAMDOC option can be enabled to get warnings for 
 functions that are documented, but have no documentation for their parameters 
 or return value. If set to NO (the default) doxygen will only warn about 
 wrong or incomplete parameter documentation, but not about the absence of 
@@ -562,8 +562,9 @@ If the value of the INPUT tag contains directories, you can use the
 FILE_PATTERNS tag to specify one or more wildcard pattern (like *.cpp 
 and *.h) to filter out the source-files in the directories. If left 
 blank the following patterns are tested: 
-*.c *.cc *.cxx *.cpp *.c++ *.java *.ii *.ixx *.ipp *.i++ *.inl *.h *.hh *.hxx 
-*.hpp *.h++ *.idl *.odl *.cs *.php *.php3 *.inc *.m *.mm *.py *.f90 
+*.c *.cc *.cxx *.cpp *.c++ *.d *.java *.ii *.ixx *.ipp *.i++ *.inl *.h *.hh 
+*.hxx *.hpp *.h++ *.idl *.odl *.cs *.php *.php3 *.inc *.m *.mm *.dox *.py 
+*.f90 *.f *.vhd *.vhdl
 '>
       <value name='*.c'/>
       <value name='*.cc'/>
@@ -950,9 +951,11 @@ top of each HTML page. The value NO (the default) enables the index and
 the value YES disables it. 
 ' defval='0' depends='GENERATE_HTML'/>
     <option type='int' id='ENUM_VALUES_PER_LINE' docs='
-This tag can be used to set the number of enum values (range [1..20]) 
+This tag can be used to set the number of enum values (range [0,1..20]) 
 that doxygen will group on one line in the generated HTML documentation. 
-' minval='1' maxval='20' defval='4' depends='GENERATE_HTML'/>
+Note that a value of 0 will completely suppress the enum values from
+appearing in the overview section.
+' minval='0' maxval='20' defval='4' depends='GENERATE_HTML'/>
     <option type='bool' id='GENERATE_TREEVIEW' defval='0' docs='
 The GENERATE_TREEVIEW tag is used to specify whether a tree-like index 
 structure should be generated to display hierarchical information. 
@@ -982,6 +985,31 @@ when you change the font size after a successful doxygen run you need
 to manually remove any form_*.png images from the HTML output directory 
 to force them to be regenerated. 
 ' minval='8' maxval='50' defval='10' depends='GENERATE_HTML'/>
+    <option type='bool' id='FORMULA_TRANSPARENT' docs='
+Use the FORMULA_TRANPARENT tag to determine whether or not the images 
+generated for formulas are transparent PNGs. Transparent PNGs are 
+not supported properly for IE 6.0, but are supported on all modern browsers. 
+Note that when changing this option you need to delete any form_*.png files 
+in the HTML output before the changes have effect. 
+' defval='1' depends='GENERATE_HTML'/>
+    <option type='bool' id='USE_MATHJAX' docs='
+Enable the USE_MATHJAX option to render LaTeX formulas using MathJax 
+(see http://www.mathjax.org) which uses client side Javascript for the 
+rendering instead of using prerendered bitmaps. Use this if you do not 
+have LaTeX installed or if you want to formulas look prettier in the HTML 
+output. When enabled you also need to install MathJax separately and 
+configure the path to it using the MATHJAX_RELPATH option.
+' defval='0'/> 
+    <option type='string' id='MATHJAX_RELPATH' docs=' 
+When MathJax is enabled you need to specify the location relative to the 
+HTML output directory using the MATHJAX_RELPATH option. The destination 
+directory should contain the MathJax.js script. For instance, if the mathjax 
+directory is located at the same level as the HTML output directory, then 
+MATHJAX_RELPATH should be ../mathjax. The default value points to the
+mathjax.org site, so you can quickly see the result without installing 
+MathJax, but it is strongly recommended to install a local copy of MathJax 
+before deployment.
+' defval='http://www.mathjax.org/mathjax'/>
     <option type='bool' id='SEARCHENGINE' docs='
 When the SEARCHENGINE tag is enabled doxygen will generate a search box 
 for the HTML output. The underlying search engine uses javascript 
@@ -997,7 +1025,7 @@ implemented using a PHP enabled web server instead of at the web client
 using Javascript. Doxygen will generate the search PHP script and index 
 file to put on the web server. The advantage of the server 
 based approach is that it scales better to large projects and allows 
-full text search. The disadvances is that it is more difficult to setup 
+full text search. The disadvantages are that it is more difficult to setup 
 and does not have live searching capabilities. 
 ' defval='0' depends='SEARCHENGINE'/>
   </group>
@@ -1028,9 +1056,9 @@ If the COMPACT_LATEX tag is set to YES Doxygen generates more compact
 LaTeX documents. This may be useful for small projects and may help to 
 save some trees in general. 
 ' defval='0' depends='GENERATE_LATEX'/>
-    <option type='enum' id='PAPER_TYPE' defval='a4wide' docs='
+    <option type='enum' id='PAPER_TYPE' defval='a4' docs='
 The PAPER_TYPE tag can be used to set the paper type that is used 
-by the printer. Possible values are: a4, a4wide, letter, legal and 
+by the printer. Possible values are: a4, letter, legal and 
 executive. If left blank a4wide will be used. 
 ' depends='GENERATE_LATEX'>
       <value name='a4'/>
@@ -1299,9 +1327,8 @@ interpreter (i.e. the result of `which perl&apos;).
 If the CLASS_DIAGRAMS tag is set to YES (the default) Doxygen will 
 generate a inheritance diagram (in HTML, RTF and LaTeX) for classes with base 
 or super classes. Setting the tag to NO turns the diagrams off. Note that 
-this option is superseded by the HAVE_DOT option below. This is only a 
-fallback. It is recommended to install and use dot, since it yields more 
-powerful graphs. 
+this option also works with HAVE_DOT disabled, but it is recommended to 
+install and use dot, since it yields more powerful graphs. 
 ' defval='1'/>
     <option type='string' id='MSCGEN_PATH' format='string' docs='
 You can define message sequence charts within doxygen comments using the \msc 
@@ -1402,7 +1429,7 @@ graphs for selected functions only using the \callergraph command.
 ' defval='0' depends='HAVE_DOT'/>
     <option type='bool' id='GRAPHICAL_HIERARCHY' docs='
 If the GRAPHICAL_HIERARCHY and HAVE_DOT tags are set to YES then doxygen 
-will graphical hierarchy of all classes instead of a textual one. 
+will generate a graphical hierarchy of all classes instead of a textual one. 
 ' defval='1' depends='HAVE_DOT'/>
     <option type='bool' id='DIRECTORY_GRAPH' docs='
 If the DIRECTORY_GRAPH, SHOW_DIRECTORIES and HAVE_DOT tags are set to YES 
@@ -1412,7 +1439,7 @@ relations between the files in the directories.
 ' defval='1' depends='HAVE_DOT'/>
     <option type='enum' id='DOT_IMAGE_FORMAT' defval='png' docs='
 The DOT_IMAGE_FORMAT tag can be used to set the image format of the images 
-generated by dot. Possible values are png, jpg, or gif 
+generated by dot. Possible values are png, jpg, or gif. 
 If left blank png will be used. 
 ' depends='HAVE_DOT'>
       <value name='png'/>
@@ -1428,6 +1455,12 @@ The DOTFILE_DIRS tag can be used to specify one or more directories that
 contain dot files that are included in the documentation (see the 
 \dotfile command). 
 ' depends='HAVE_DOT'>
+    </option>
+    <option type='list' id='MSCFILE_DIRS' format='dir' docs='
+The MSCFILE_DIRS tag can be used to specify one or more directories that 
+contain msc files that are included in the documentation (see the 
+\mscfile command). 
+' >
     </option>
     <option type='int' id='DOT_GRAPH_MAX_NODES' docs='
 The DOT_GRAPH_MAX_NODES tag can be used to set the maximum number of 

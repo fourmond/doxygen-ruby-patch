@@ -86,15 +86,15 @@ class FTVHelp : public IndexIntf
     //void addIndexItem(const char *, const char *, 
     //                  const char *, const char *,
     //                  const char *, const MemberDef *) {}
-    void addIndexItem(Definition *,MemberDef *,const char *,const char *) {}
+    void addIndexItem(Definition *,MemberDef *,const char *) {}
     void addIndexFile(const char *) {}
     void addImageFile(const char *) {}
     void addStyleSheetFile(const char *) {}
     void generateTreeView();
     void generateTreeViewInline(FTextStream &t);
+    static void generateTreeViewImages();
   private:
     void generateScript(FTextStream &t);
-    void generateTreeViewImages();
     void generateTree(FTextStream &t,const QList<FTVNode> &nl,int level);
     void generateIndent(FTextStream &t,FTVNode *n,int level);
     void generateLink(FTextStream &t,FTVNode *n);

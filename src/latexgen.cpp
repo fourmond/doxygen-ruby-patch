@@ -161,7 +161,12 @@ void LatexGenerator::init()
 
   t << endl
     << "clean:" << endl
-    << "\trm -f *.ps *.dvi *.aux *.toc *.idx *.ind *.ilg *.log *.out refman.pdf" << endl;
+#if defined(_MSC_VER)
+    << "\tdel "  
+#else
+    << "\trm -f " 
+#endif
+    << "*.ps *.dvi *.aux *.toc *.idx *.ind *.ilg *.log *.out refman.pdf" << endl;
 
   createSubDirs(d);
 }
@@ -182,21 +187,24 @@ static void writeDefaultHeaderPart1(FTextStream &t)
   t << "]{";
   if (Config_getBool("COMPACT_LATEX")) t << "article"; else t << "book";
   t << "}\n";
-  if (paperType=="a4wide") t << "\\usepackage{a4wide}\n";
+  // the next package is obsolete (see bug 563698)
+  //if (paperType=="a4wide") t << "\\usepackage{a4wide}\n";
   t << "\\usepackage{makeidx}\n"
     "\\usepackage{graphicx}\n"
     "\\usepackage{multicol}\n"
     "\\usepackage{float}\n"
     "\\usepackage{listings}\n"
     "\\usepackage{color}\n"
+    "\\usepackage{ifthen}\n"
+    "\\usepackage[table]{xcolor}\n"
     "\\usepackage{textcomp}\n"
     "\\usepackage{alltt}\n"
     //"\\usepackage{ae,aecompl,aeguill}\n"
     ;
-  if (Config_getBool("USE_PDFLATEX"))
-  {
-    t << "\\usepackage{times}" << endl;
-  }
+  //if (Config_getBool("USE_PDFLATEX"))
+  //{
+  //  t << "\\usepackage{times}" << endl;
+  //}
   if (Config_getBool("PDF_HYPERLINKS")) 
   {
     t << "\\usepackage{ifpdf}" << endl
@@ -229,6 +237,9 @@ static void writeDefaultHeaderPart1(FTextStream &t)
     // if the command is empty, no output is needed.
     t << sLanguageSupportCommand << endl;
   }
+  t << "\\usepackage{mathptmx}\n";
+  t << "\\usepackage[scaled=.90]{helvet}\n";
+  t << "\\usepackage{courier}\n";
   t << "\\usepackage{doxygen}\n";
 
   // define option for listings
@@ -307,7 +318,53 @@ static void writeDefaultStyleSheetPart1(FTextStream &t)
        "\\RequirePackage{calc}\n"
        "\\RequirePackage{color}\n"
        "\\RequirePackage{fancyhdr}\n"
-       "\\RequirePackage{verbatim}\n\n";
+       "\\RequirePackage{longtable}\n"
+       "\\RequirePackage{verbatim}\n"
+       "\\RequirePackage{ifthen}\n"
+       "\\RequirePackage{xcolor}\n\n";
+
+  t << "% Use helvetica font instead of times roman\n"
+       "\\RequirePackage{helvet}\n"
+       "\\RequirePackage{sectsty}\n"
+       "\\RequirePackage{tocloft}\n"
+       "\\allsectionsfont{\\usefont{OT1}{phv}{bc}{n}\\selectfont}\n"
+       "\\renewcommand{\\cftchapfont}{%\n"
+       "  \\fontsize{11}{13}\\usefont{OT1}{phv}{bc}{n}\\selectfont\n"
+       "}\n"
+       "\\renewcommand{\\cftchappagefont}{%\n"
+       "  \\fontsize{11}{13}\\usefont{OT1}{phv}{c}{n}\\selectfont\n"
+       "}\n"
+       "\\renewcommand{\\cftsecfont}{%\n"
+       "  \\fontsize{10}{12}\\usefont{OT1}{phv}{c}{n}\\selectfont\n"
+       "}\n"
+       "\\renewcommand{\\cftsecpagefont}{%\n"
+       "  \\fontsize{10}{12}\\usefont{OT1}{phv}{c}{n}\\selectfont\n"
+       "}\n"
+       "\\renewcommand{\\cftsubsecfont}{%\n"
+       "  \\fontsize{10}{12}\\usefont{OT1}{phv}{c}{n}\\selectfont\n"
+       "}\n"
+       "\\renewcommand{\\cftsubsecpagefont}{%\n"
+       "  \\fontsize{10}{12}\\usefont{OT1}{phv}{c}{n}\\selectfont\n"
+       "}\n"
+       "\\renewcommand{\\cftsubsubsecfont}{%\n"
+       "  \\fontsize{9}{11}\\usefont{OT1}{phv}{c}{n}\\selectfont\n"
+       "}\n"
+       "\\renewcommand{\\cftsubsubsecpagefont}{%\n"
+       "  \\fontsize{9}{11}\\usefont{OT1}{phv}{c}{n}\\selectfont\n"
+       "}\n"
+       "\\renewcommand{\\cftparafont}{%\n"
+       "  \\fontsize{9}{11}\\usefont{OT1}{phv}{c}{n}\\selectfont\n"
+       "}\n"
+       "\\renewcommand{\\cftparapagefont}{%\n"
+       "  \\fontsize{9}{11}\\usefont{OT1}{phv}{c}{n}\\selectfont\n"
+       "}\n"
+       "\\renewcommand{\\cfttoctitlefont}{%\n"
+       "  \\fontsize{20}{22}\\usefont{OT1}{phv}{b}{n}\\selectfont\n"
+       "}\n"
+       "\\renewcommand{\\rmdefault}{phv}\n"
+       "\\renewcommand{\\bfdefault}{bc}\n"
+       "\n\n";
+
   t << "% Setup fancy headings\n"
        "\\pagestyle{fancyplain}\n"
        "\\newcommand{\\clearemptydoublepage}{%\n"
@@ -320,25 +377,42 @@ static void writeDefaultStyleSheetPart1(FTextStream &t)
   t << "\\renewcommand{\\sectionmark}[1]{%\n"
        "  \\markright{\\thesection\\ #1}%\n"
        "}\n";
-  t << "\\lhead[\\fancyplain{}{\\bfseries\\thepage}]{%\n"
-       "  \\fancyplain{}{\\bfseries\\rightmark}%\n"
-       "}\n";
-  t << "\\rhead[\\fancyplain{}{\\bfseries\\leftmark}]{%\n"
-       "  \\fancyplain{}{\\bfseries\\thepage}%\n"
-       "}\n";
-  t << "\\rfoot[\\fancyplain{}{\\bfseries\\scriptsize%\n  ";
+
+  //t << "\\lhead[\\fancyplain{}{\\bfseries\\thepage}]{%\n"
+  //     "  \\fancyplain{}{\\bfseries\\rightmark}%\n"
+  //     "}\n";
+  //t << "\\rhead[\\fancyplain{}{\\bfseries\\leftmark}]{%\n"
+  //     "  \\fancyplain{}{\\bfseries\\thepage}%\n"
+  //     "}\n";
+  //t << "\\rfoot[\\fancyplain{}{\\bfseries\\scriptsize%\n  ";
+  t << "\\fancyhead[LE]{\\fancyplain{}{\\bfseries\\thepage}}\n";
+  t << "\\fancyhead[CE]{\\fancyplain{}{}}\n";
+  t << "\\fancyhead[RE]{\\fancyplain{}{\\bfseries\\leftmark}}\n";
+  t << "\\fancyhead[LO]{\\fancyplain{}{\\bfseries\\rightmark}}\n";
+  t << "\\fancyhead[CO]{\\fancyplain{}{}}\n";
+  t << "\\fancyhead[RO]{\\fancyplain{}{\\bfseries\\thepage}}\n";
+
+  t << "\\fancyfoot[LE]{\\fancyplain{}{}}\n";
+  t << "\\fancyfoot[CE]{\\fancyplain{}{}}\n";
+  t << "\\fancyfoot[RE]{\\fancyplain{}{\\bfseries\\scriptsize ";
 }
 
 static void writeDefaultStyleSheetPart2(FTextStream &t)
 {
-  t << "\\lfoot[]{\\fancyplain{}{\\bfseries\\scriptsize%\n  ";
+  t << "}}\n";
+  t << "\\fancyfoot[LO]{\\fancyplain{}{\\bfseries\\scriptsize ";
+  //t << "\\lfoot[]{\\fancyplain{}{\\bfseries\\scriptsize%\n  ";
+
 }
 
 static void writeDefaultStyleSheetPart3(FTextStream &t)
 {
   static bool latexSourceCode = Config_getBool("LATEX_SOURCE_CODE");
   t << "}}\n";
-  t << "\\cfoot{}\n\n";
+  //t << "\\cfoot{}\n\n";
+  t << "\\fancyfoot[CO]{\\fancyplain{}{}}\n";
+  t << "\\fancyfoot[RO]{\\fancyplain{}{}}\n";
+
   t << "%---------- Internal commands used in this style file ----------------\n\n";
   t << "% Generic environment used by all paragraph-based environments defined\n"
        "% below. Note that the command \\title{...} needs to be defined inside\n"
@@ -537,10 +611,28 @@ static void writeDefaultStyleSheetPart3(FTextStream &t)
        "  \\end{list}%\n"
        "}\n\n";
   t << "% Used by parameter lists\n"
-       "\\newenvironment{DoxyParams}[1]{%\n"
-       "  \\begin{DoxyDesc}{#1}%\n"
+       "\\newenvironment{DoxyParams}[2][]{%\n"
+       "  \\begin{DoxyDesc}{#2}%\n"
        "    \\begin{description}%\n"
+       "      \\item[] \\hspace{\\fill} \\vspace{-25pt}%\n"
+       "      \\definecolor{tableShade}{HTML}{F8F8F8}%\n"
+       "      \\rowcolors{1}{white}{tableShade}%\n"
+       "      \\arrayrulecolor{gray}%\n"
+       "      \\setlength{\\tabcolsep}{0.01\\textwidth}%\n"
+       "      \\ifthenelse{\\equal{#1}{}}\n" // default: name, docs columns
+       "      {\\begin{longtable}{|>{\\raggedleft\\hspace{0pt}}p{0.15\\textwidth}|%\n"
+       "                          p{0.87\\textwidth}|}}%\n"
+       "      {\\ifthenelse{\\equal{#1}{1}}%\n" // inout, name, docs columns, or type, name, docs columns
+       "       {\\begin{longtable}{|>{\\centering}p{0.10\\textwidth}|%\n"
+       "                          >{\\raggedleft\\hspace{0pt}}p{0.15\\textwidth}|%\n"
+       "                          p{0.75\\textwidth}|}}%\n"
+       "       {\\begin{longtable}{|>{\\centering}p{0.10\\textwidth}|%\n" // inout, type, name, docs columns
+       "                          >{\\centering\\hspace{0pt}}p{0.15\\textwidth}|%\n"
+       "                          >{\\raggedleft\\hspace{0pt}}p{0.15\\textwidth}|%\n"
+       "                          p{0.58\\textwidth}|}}%\n"
+       "       }\\hline%\n"
        "}{%\n"
+       "      \\end{longtable}%\n"
        "    \\end{description}%\n"
        "  \\end{DoxyDesc}%\n"
        "}\n\n";
@@ -553,7 +645,16 @@ static void writeDefaultStyleSheetPart3(FTextStream &t)
        "\\newenvironment{DoxyRetVals}[1]{%\n"
        "  \\begin{DoxyDesc}{#1}%\n"
        "    \\begin{description}%\n"
+       "      \\item[] \\hspace{\\fill} \\vspace{-25pt}%\n"
+       "      \\definecolor{tableShade}{HTML}{F8F8F8}%\n"
+       "      \\rowcolors{1}{white}{tableShade}%\n"
+       "      \\arrayrulecolor{gray}%\n"
+       "      \\setlength{\\tabcolsep}{0.01\\textwidth}%\n"
+       "      \\begin{longtable}{|>{\\raggedleft\\hspace{0pt}}p{0.25\\textwidth}|%\n"
+       "                          p{0.77\\textwidth}|}%\n"
+       "      \\hline%\n"
        "}{%\n"
+       "      \\end{longtable}%\n"
        "    \\end{description}%\n"
        "  \\end{DoxyDesc}%\n"
        "}\n\n";
@@ -561,7 +662,16 @@ static void writeDefaultStyleSheetPart3(FTextStream &t)
        "\\newenvironment{DoxyExceptions}[1]{%\n"
        "  \\begin{DoxyDesc}{#1}%\n"
        "    \\begin{description}%\n"
+       "      \\item[] \\hspace{\\fill} \\vspace{-25pt}%\n"
+       "      \\definecolor{tableShade}{HTML}{F8F8F8}%\n"
+       "      \\rowcolors{1}{white}{tableShade}%\n"
+       "      \\arrayrulecolor{gray}%\n"
+       "      \\setlength{\\tabcolsep}{0.01\\textwidth}%\n"
+       "      \\begin{longtable}{|>{\\raggedleft\\hspace{0pt}}p{0.25\\textwidth}|%\n"
+       "                          p{0.77\\textwidth}|}%\n"
+       "      \\hline%\n"
        "}{%\n"
+       "      \\end{longtable}%\n"
        "    \\end{description}%\n"
        "  \\end{DoxyDesc}%\n"
        "}\n\n";
@@ -569,7 +679,16 @@ static void writeDefaultStyleSheetPart3(FTextStream &t)
        "\\newenvironment{DoxyTemplParams}[1]{%\n"
        "  \\begin{DoxyDesc}{#1}%\n"
        "    \\begin{description}%\n"
+       "      \\item[] \\hspace{\\fill} \\vspace{-25pt}%\n"
+       "      \\definecolor{tableShade}{HTML}{F8F8F8}%\n"
+       "      \\rowcolors{1}{white}{tableShade}%\n"
+       "      \\arrayrulecolor{gray}%\n"
+       "      \\setlength{\\tabcolsep}{0.01\\textwidth}%\n"
+       "      \\begin{longtable}{|>{\\raggedleft\\hspace{0pt}}p{0.25\\textwidth}|%\n"
+       "                          p{0.77\\textwidth}|}%\n"
+       "      \\hline%\n"
        "}{%\n"
+       "      \\end{longtable}%\n"
        "    \\end{description}%\n"
        "  \\end{DoxyDesc}%\n"
        "}\n\n";
@@ -623,7 +742,8 @@ static void writeDefaultStyleSheetPart3(FTextStream &t)
   t << "\\setlength{\\parindent}{0cm}\n";
   t << "\\setlength{\\parskip}{0.2cm}\n";
   t << "\\addtocounter{secnumdepth}{1}\n";
-  t << "\\sloppy\n";
+  // \sloppy should not be used, see bug 563698 
+  //t << "\\sloppy\n";
   t << "\\usepackage[T1]{fontenc}\n";
   t << "\\makeatletter\n";
   t << "\\renewcommand{\\paragraph}{\\@startsection{paragraph}{4}{0ex}%\n";
@@ -659,7 +779,6 @@ void LatexGenerator::writeHeaderFile(QFile &f)
 void LatexGenerator::writeStyleSheetFile(QFile &f)
 {
   FTextStream t(&f);
-  //t.setEncoding(QTextStream::UnicodeUTF8);
 
   writeDefaultStyleSheetPart1(t);
   QCString &projectName = Config_getString("PROJECT_NAME");
@@ -1129,14 +1248,11 @@ void LatexGenerator::writeStyleInfo(int part)
       break;
     case 2:
       {
-        //t << " Dimitri van Heesch \\copyright~1997-2010";
-        t << "}]{}\n";
         writeDefaultStyleSheetPart2(t);
       }
       break;
     case 4:
       {
-        //t << " Dimitri van Heesch \\copyright~1997-2010";
         writeDefaultStyleSheetPart3(t);
         endPlainFile();
       }
@@ -1602,7 +1718,6 @@ void LatexGenerator::endSection(const char *lab,SectionInfo::SectionType)
 }
 
 
-//void LatexGenerator::docifyStatic(QTextStream &t,const char *str)
 void LatexGenerator::docify(const char *str)
 {
   filterLatexString(t,str,insideTabbing,FALSE);

@@ -29,7 +29,7 @@
 #include <qstack.h>
 #include <qdict.h>
 #include <qfile.h>
-#include <qtextstream.h>
+#include "ftextstream.h"
 
 #define PERLOUTPUT_MAX_INDENTATION 40
 
@@ -38,9 +38,9 @@ class PerlModOutputStream
 public:
 
   QCString m_s;
-  QTextStream *m_t;
+  FTextStream *m_t;
 
-  PerlModOutputStream(QTextStream *t = 0) : m_t(t) { }
+  PerlModOutputStream(FTextStream *t = 0) : m_t(t) { }
 
   void add(char c);
   void add(const char *s);
@@ -350,6 +350,8 @@ public:
   void visitPost(DocImage *);
   void visitPre(DocDotFile *);
   void visitPost(DocDotFile *);
+  void visitPre(DocMscFile *);
+  void visitPost(DocMscFile *);
   void visitPre(DocLink *);
   void visitPost(DocLink *);
   void visitPre(DocRef *);
@@ -555,7 +557,7 @@ void PerlModDocVisitor::visit(DocSymbol *sy)
     case DocSymbol::Apos:    s = "\\\'"; break;
     case DocSymbol::Aelig:   symbol = "aelig"; break;
     case DocSymbol::AElig:   symbol = "AElig"; break;
-    case DocSymbol::Unknown: err("Error: unknown symbol found\n");
+    case DocSymbol::Unknown: err("error: unknown symbol found\n");
                              break;
   }
   if (c != 0) 
@@ -811,7 +813,7 @@ void PerlModDocVisitor::visitPre(DocSimpleSect *s)
   case DocSimpleSect::User:		type = "par"; break;
   case DocSimpleSect::Rcs:		type = "rcs"; break;
   case DocSimpleSect::Unknown:
-    err("Error: unknown simple section found\n");
+    err("error: unknown simple section found\n");
     break;
   }
   leaveText();
@@ -1094,6 +1096,20 @@ void PerlModDocVisitor::visitPost(DocDotFile *)
   m_output.add("</dotfile>");
 #endif
 }
+void PerlModDocVisitor::visitPre(DocMscFile *)
+{
+#if 0
+  m_output.add("<mscfile name=\""); m_output.add(df->file()); m_output.add("\">");
+#endif
+}
+
+void PerlModDocVisitor::visitPost(DocMscFile *)
+{
+#if 0
+  m_output.add("</dotfile>");
+#endif
+}
+
 
 void PerlModDocVisitor::visitPre(DocLink *lnk)
 {
@@ -1170,7 +1186,7 @@ void PerlModDocVisitor::visitPre(DocParamSect *s)
   case DocParamSect::Exception: type = "exceptions"; break;
   case DocParamSect::TemplateParam: type = "templateparam"; break;
   case DocParamSect::Unknown:
-    err("Error: unknown parameter section found\n");
+    err("error: unknown parameter section found\n");
     break;
   }
   openOther();
@@ -2035,7 +2051,7 @@ bool PerlModGenerator::generatePerlModOutput()
   if (!createOutputFile(outputFile, pathDoxyDocsPM))
     return false;
   
-  QTextStream outputTextStream(&outputFile);
+  FTextStream outputTextStream(&outputFile);
   PerlModOutputStream outputStream(&outputTextStream);
   m_output.setPerlModOutputStream(&outputStream);
   m_output.add("$doxydocs=").openHash();
@@ -2118,13 +2134,13 @@ bool PerlModGenerator::createOutputDir(QDir &perlModDir)
       dir.setPath(QDir::currentDirPath());
       if (!dir.mkdir(outputDirectory))
       {
-	err("Error: tag OUTPUT_DIRECTORY: Output directory `%s' does not "
+	err("error: tag OUTPUT_DIRECTORY: Output directory `%s' does not "
 	    "exist and cannot be created\n",outputDirectory.data());
 	exit(1);
       }
       else if (!Config_getBool("QUIET"))
       {
-	err("Notice: Output directory `%s' does not exist. "
+	err("notice: Output directory `%s' does not exist. "
 	    "I have created it for you.\n", outputDirectory.data());
       }
       dir.cd(outputDirectory);
@@ -2158,7 +2174,7 @@ bool PerlModGenerator::generateDoxyStructurePM()
   if (!createOutputFile(doxyModelPM, pathDoxyStructurePM))
     return false;
 
-  QTextStream doxyModelPMStream(&doxyModelPM);
+  FTextStream doxyModelPMStream(&doxyModelPM);
   doxyModelPMStream << 
     "sub memberlist($) {\n"
     "    my $prefix = $_[0];\n"
@@ -2345,7 +2361,7 @@ bool PerlModGenerator::generateDoxyRules()
   bool perlmodLatex = Config_getBool("PERLMOD_LATEX");
   QCString prefix = Config_getString("PERLMOD_MAKEVAR_PREFIX");
 
-  QTextStream doxyRulesStream(&doxyRules);
+  FTextStream doxyRulesStream(&doxyRules);
   doxyRulesStream <<
     prefix << "DOXY_EXEC_PATH = " << pathDoxyExec << "\n" <<
     prefix << "DOXYFILE = " << pathDoxyfile << "\n" <<
@@ -2442,7 +2458,7 @@ bool PerlModGenerator::generateMakefile()
   bool perlmodLatex = Config_getBool("PERLMOD_LATEX");
   QCString prefix = Config_getString("PERLMOD_MAKEVAR_PREFIX");
 
-  QTextStream makefileStream(&makefile);
+  FTextStream makefileStream(&makefile);
   makefileStream <<
     ".PHONY: default clean" << (perlmodLatex ? " pdf" : "") << "\n"
     "default: " << (perlmodLatex ? "pdf" : "clean") << "\n"
@@ -2466,7 +2482,7 @@ bool PerlModGenerator::generateDoxyLatexStructurePL()
   if (!createOutputFile(doxyLatexStructurePL, pathDoxyLatexStructurePL))
     return false;
 
-  QTextStream doxyLatexStructurePLStream(&doxyLatexStructurePL);
+  FTextStream doxyLatexStructurePLStream(&doxyLatexStructurePL);
   doxyLatexStructurePLStream << 
     "use DoxyStructure;\n"
     "\n"
@@ -2500,7 +2516,7 @@ bool PerlModGenerator::generateDoxyLatexPL()
   if (!createOutputFile(doxyLatexPL, pathDoxyLatexPL))
     return false;
 
-  QTextStream doxyLatexPLStream(&doxyLatexPL);
+  FTextStream doxyLatexPLStream(&doxyLatexPL);
   doxyLatexPLStream << 
     "use DoxyStructure;\n"
     "use DoxyDocs;\n"
@@ -2623,7 +2639,7 @@ bool PerlModGenerator::generateDoxyFormatTex()
   if (!createOutputFile(doxyFormatTex, pathDoxyFormatTex))
     return false;
 
-  QTextStream doxyFormatTexStream(&doxyFormatTex);
+  FTextStream doxyFormatTexStream(&doxyFormatTex);
   doxyFormatTexStream << 
     "\\def\\Defcs#1{\\long\\expandafter\\def\\csname#1\\endcsname}\n"
     "\\Defcs{Empty}{}\n"
@@ -2786,7 +2802,7 @@ bool PerlModGenerator::generateDoxyLatexTex()
   if (!createOutputFile(doxyLatexTex, pathDoxyLatexTex))
     return false;
 
-  QTextStream doxyLatexTexStream(&doxyLatexTex);
+  FTextStream doxyLatexTexStream(&doxyLatexTex);
   doxyLatexTexStream <<
     "\\documentclass[a4paper,12pt]{article}\n"
     "\\usepackage[latin1]{inputenc}\n"

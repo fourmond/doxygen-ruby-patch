@@ -463,7 +463,7 @@ NamespaceDef *getResolvedNamespace(const char *name)
     }
     if (count==10)
     {
-      err("Warning: possible recursive namespace alias detected for %s!\n",name);
+      err("warning: possible recursive namespace alias detected for %s!\n",name);
     }
     return Doxygen::namespaceSDict->find(subst->data());
   }
@@ -1217,6 +1217,10 @@ static void getResolvedSymbol(Definition *scope,
               }
               else
               {
+                bestMatch = 0;
+                bestTypedef = md;
+                bestTemplSpec.resize(0);
+                bestResolvedType.resize(0);
                 //printf("      no match\n");
               }
             }
@@ -1295,12 +1299,22 @@ ClassDef *getResolvedClassRec(Definition *scope,
     return 0; // empty name
   }
 
+  //printf("Looking for symbol %s\n",name.data());
   DefinitionIntf *di = Doxygen::symbolMap->find(name);
-  //printf("Looking for symbol %s result=%p\n",name.data(),di);
   if (di==0) 
   {
-    return 0;
+    di = Doxygen::symbolMap->find(name+"-g");
+    if (di==0)
+    {
+      di = Doxygen::symbolMap->find(name+"-p");
+      if (di==0)
+      {
+        //printf("no such symbol!\n");
+        return 0;
+      }
+    }
   }
+  //printf("found symbol!\n");
 
   bool hasUsingStatements = 
     (fileScope && ((fileScope->getUsedNamespaces() && 
@@ -1844,6 +1858,15 @@ void linkifyText(const TextGeneratorIntf &out,Definition *scope,
           found=TRUE;
         }
       }
+      else if ((cd=getClass(matchWord+"-g"))) // C# generic as well
+      {
+        // add link to the result
+        if (external ? cd->isLinkable() : cd->isLinkableInProject())
+        {
+          out.writeLink(cd->getReference(),cd->getOutputFileBase(),0,word);
+          found=TRUE;
+        }
+      }
       else
       {
         //printf("   -> nothing\n");
@@ -1914,6 +1937,7 @@ void writeExample(OutputList &ol,ExampleSDict *ed)
       ol.disable(OutputGenerator::Latex);
       ol.disable(OutputGenerator::RTF);
       // link for Html / man
+      //printf("writeObjectLink(file=%s)\n",e->file.data());
       ol.writeObjectLink(0,e->file,e->anchor,e->name);
       ol.popGeneratorState();
 
@@ -2125,7 +2149,7 @@ QCString recodeString(const QCString &str,const char *fromEncoding,const char *t
   void *cd = portable_iconv_open(outputEncoding,inputEncoding);
   if (cd==(void *)(-1))
   {
-    err("Error: unsupported character conversion: '%s'->'%s'\n",
+    err("error: unsupported character conversion: '%s'->'%s'\n",
         inputEncoding.data(),outputEncoding.data());
     exit(1);
   }
@@ -2142,7 +2166,7 @@ QCString recodeString(const QCString &str,const char *fromEncoding,const char *t
   }
   else
   {
-    err("Error: failed to translate characters from %s to %s: %s\n",
+    err("error: failed to translate characters from %s to %s: %s\n",
         inputEncoding.data(),outputEncoding.data(),strerror(errno));
     exit(1);
   }
@@ -2164,7 +2188,7 @@ QCString transcodeCharacterStringToUTF8(const QCString &input)
   void *cd = portable_iconv_open(outputEncoding,inputEncoding);
   if (cd==(void *)(-1)) 
   {
-    err("Error: unsupported character conversion: '%s'->'%s'\n",
+    err("error: unsupported character conversion: '%s'->'%s'\n",
         inputEncoding.data(),outputEncoding);
     error=TRUE;
   }
@@ -2183,7 +2207,7 @@ QCString transcodeCharacterStringToUTF8(const QCString &input)
     }
     else
     {
-      err("Error: failed to translate characters from %s to %s: check INPUT_ENCODING\ninput=[%s]\n",
+      err("error: failed to translate characters from %s to %s: check INPUT_ENCODING\ninput=[%s]\n",
           inputEncoding.data(),outputEncoding,input.data());
       error=TRUE;
     }
@@ -2228,7 +2252,7 @@ QCString fileToString(const char *name,bool filter)
     QFileInfo fi(name);
     if (!fi.exists() || !fi.isFile())
     {
-      err("Error: file `%s' not found\n",name);
+      err("error: file `%s' not found\n",name);
       return "";
     }
     QCString filterName = getFileFilter(name);
@@ -2262,7 +2286,7 @@ QCString fileToString(const char *name,bool filter)
       FILE *f=portable_popen(cmd,"r");
       if (!f)
       {
-        err("Error: could not execute filter %s\n",filterName.data());
+        err("error: could not execute filter %s\n",filterName.data());
         return "";
       }
       const int bSize=4096;
@@ -2284,7 +2308,7 @@ QCString fileToString(const char *name,bool filter)
   }
   if (!fileOpened)  
   {
-    err("Error: cannot open file `%s' for reading\n",name);
+    err("error: cannot open file `%s' for reading\n",name);
   }
   return "";
 }
@@ -2340,7 +2364,7 @@ int minClassDistance(const ClassDef *cd,const ClassDef *bcd,int level)
   if (cd==bcd) return level; 
   if (level==256)
   {
-    err("Error: Internal inconsistency: found class %s seem to have a recursive "
+    err("error: Internal inconsistency: found class %s seem to have a recursive "
         "inheritance relation! Please send a bug report to dimitri@stack.nl\n",cd->name().data());
     return -1;
   }
@@ -3238,6 +3262,10 @@ static QCString getCanonicalTypeForIdentifier(
   {
     result = mType->qualifiedName();
   }
+  else if (mType && mType->isTypedef()) // a typedef
+  {
+    result = mType->qualifiedName();
+  }
   else // fallback
   {
     resolvedType = resolveTypeDef(d,word);
@@ -4087,7 +4115,10 @@ static bool getScopeDefs(const char *docScope,const char *scope,
     QCString fullName=scopeName.copy();
     if (scopeOffset>0) fullName.prepend(docScopeName.left(scopeOffset)+"::");
 
-    if ((cd=getClass(fullName)) && cd->isLinkable())
+    if (((cd=getClass(fullName)) ||         // normal class
+         (cd=getClass(fullName+"-p")) ||    // ObjC protocol
+         (cd=getClass(fullName+"-g"))       // C# generic
+        ) && cd->isLinkable())
     {
       return TRUE; // class link written => quit 
     }
@@ -4110,7 +4141,7 @@ static bool getScopeDefs(const char *docScope,const char *scope,
 
 static bool isLowerCase(QCString &s)
 {
-  char *p=s.data();
+  uchar *p=(uchar*)s.data();
   if (p==0) return TRUE;
   int c;
   while ((c=*p++)) if (!islower(c)) return FALSE;
@@ -4430,6 +4461,11 @@ bool resolveLink(/* in */ const char *scName,
     return TRUE;
   }
   else if ((cd=getClass(linkRef+"-p"))) // Obj-C protocol link
+  {
+    *resContext=cd;
+    return TRUE;
+  }
+  else if ((cd=getClass(linkRef+"-g"))) // C# generic link
   {
     *resContext=cd;
     return TRUE;
@@ -6410,14 +6446,15 @@ bool updateLanguageMapping(const QCString &extension,const QCString &language)
 
   // found the language
   SrcLangExt parserId = p->parserId;
-  QCString extName = extension;
+  QCString extName = extension.lower();
   if (extName.isEmpty()) return FALSE;
   if (extName.at(0)!='.') extName.prepend(".");
   if (g_extLookup.find(extension)!=0) // language was already register for this ext
   {
     g_extLookup.remove(extension);
   }
-  g_extLookup.insert(extension,new int(parserId));
+  //printf("registering extension %s\n",extName.data());
+  g_extLookup.insert(extName,new int(parserId));
   if (!Doxygen::parserManager->registerExtension(extName,p->parserName))
   {
     err("Failed to assign extension %s to parser %s for language %s\n",
@@ -6464,16 +6501,18 @@ SrcLangExt getLanguageFromFileName(const QCString fileName)
   int i = fileName.findRev('.');
   if (i!=-1) // name has an extension
   {
-    QCString extStr=fileName.right(fileName.length()-i);
+    QCString extStr=fileName.right(fileName.length()-i).lower();
     if (!extStr.isEmpty()) // non-empty extension
     {
       int *pVal=g_extLookup.find(extStr);
       if (pVal) // listed extension
       {
+        //printf("getLanguageFromFileName(%s)=%x\n",extStr.data(),*pVal);
         return (SrcLangExt)*pVal; 
       }
     }
   }
+  //printf("getLanguageFromFileName(%s) not found!\n",fileName.data());
   return SrcLangExt_Cpp; // not listed => assume C-ish language.
 }
 
@@ -6549,6 +6588,26 @@ bool checkIfTypedef(Definition *scope,FileDef *fileScope,const char *n)
     return FALSE;
 }
 
+int nextUtf8CharPosition(const QCString &utf8Str,int len,int startPos)
+{
+  int bytes=1;
+  if (startPos>=len) return len;
+  char c = utf8Str[startPos];
+  if (c<0) // multibyte utf-8 character
+  {
+    bytes++;   // 1xxx.xxxx: >=2 byte character
+    if (((uchar)c&0xE0)==0xE0)
+    {
+      bytes++; // 111x.xxxx: >=3 byte character
+    }
+    if (((uchar)c&0xF0)==0xF0)
+    {
+      bytes++; // 1111.xxxx: 4 byte character
+    }
+  }
+  return startPos+bytes;
+}
+
 QCString parseCommentAsText(const Definition *scope,const MemberDef *md,
     const QCString &doc,const QCString &fileName,int lineNr)
 {
@@ -6563,20 +6622,32 @@ QCString parseCommentAsText(const Definition *scope,const MemberDef *md,
   delete root;
   QCString result = s.data();
   int i=0;
-  if (result.length()>80)
+  int charCnt=0;
+  int l=result.length();
+  bool addEllipsis=FALSE;
+  while ((i=nextUtf8CharPosition(result,l,i))<l)
   {
-    for (i=80;i<100;i++) // search for nice truncation point
+    charCnt++;
+    if (charCnt>=80) break;
+  }
+  if (charCnt>=80) // try to truncate the string
+  {
+    while ((i=nextUtf8CharPosition(result,l,i))<l && charCnt<100)
     {
-      if (isspace(result.at(i)) || 
-          result.at(i)==',' || 
-          result.at(i)=='.' || 
-          result.at(i)=='?')
+      charCnt++;
+      if (isspace(result.at(i)))
+      {
+        addEllipsis=TRUE;
+      }
+      else if (result.at(i)==',' || 
+               result.at(i)=='.' || 
+               result.at(i)=='?')
       {
         break;
       }
     }
   }
-  if (i>0) result=result.left(i)+"...";
+  if (addEllipsis || charCnt==100) result=result.left(i)+"...";
   return result.data();
 }
 
@@ -6817,7 +6888,7 @@ static int transcodeCharacterBuffer(const char *fileName,BufStr &srcBuf,int size
   void *cd = portable_iconv_open(outputEncoding,inputEncoding);
   if (cd==(void *)(-1)) 
   {
-    err("Error: unsupported character conversion: '%s'->'%s': %s\n"
+    err("error: unsupported character conversion: '%s'->'%s': %s\n"
         "Check the INPUT_ENCODING setting in the config file!\n",
         inputEncoding,outputEncoding,strerror(errno));
     exit(1);
@@ -6838,7 +6909,7 @@ static int transcodeCharacterBuffer(const char *fileName,BufStr &srcBuf,int size
   }
   else
   {
-    err("%s: Error: failed to translate characters from %s to %s: check INPUT_ENCODING\n",
+    err("%s: error: failed to translate characters from %s to %s: check INPUT_ENCODING\n",
         fileName,inputEncoding,outputEncoding);
     exit(1);
   }
@@ -6862,7 +6933,7 @@ bool readInputFile(const char *fileName,BufStr &inBuf)
     QFile f(fileName);
     if (!f.open(IO_ReadOnly))
     {
-      err("Error: could not open file %s\n",fileName);
+      err("error: could not open file %s\n",fileName);
       return FALSE;
     }
     size=fi.size();
@@ -6870,7 +6941,7 @@ bool readInputFile(const char *fileName,BufStr &inBuf)
     inBuf.skip(size);
     if (f.readBlock(inBuf.data()/*+oldPos*/,size)!=size)
     {
-      err("Error while reading file %s\n",fileName);
+      err("error: problems while reading file %s\n",fileName);
       return FALSE;
     }
   }
@@ -6881,7 +6952,7 @@ bool readInputFile(const char *fileName,BufStr &inBuf)
     FILE *f=portable_popen(cmd,"r");
     if (!f)
     {
-      err("Error: could not execute filter %s\n",filterName.data());
+      err("error: could not execute filter %s\n",filterName.data());
       return FALSE;
     }
     const int bufSize=1024;

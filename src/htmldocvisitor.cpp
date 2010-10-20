@@ -200,11 +200,11 @@ void HtmlDocVisitor::visit(DocSymbol *s)
     case DocSymbol::Szlig:   m_t << "&szlig;"; break;
     case DocSymbol::Cedil:   m_t << "&" << s->letter() << "cedil;"; break;
     case DocSymbol::Ring:    m_t << "&" << s->letter() << "ring;"; break;
-    case DocSymbol::Nbsp:    m_t << "&nbsp;"; break;
+    case DocSymbol::Nbsp:    m_t << "&#160;"; break;
     case DocSymbol::AElig:   m_t << "&AElig;"; break;
     case DocSymbol::Aelig:   m_t << "&aelig;"; break;
     default:
-                             err("Error: unknown symbol found\n");
+                             err("error: unknown symbol found\n");
   }
 }
 
@@ -490,14 +490,36 @@ void HtmlDocVisitor::visit(DocFormula *f)
     forceEndParagraph(f);
     m_t << "<p class=\"formulaDsp\">" << endl;
   }
-  m_t << "<img class=\"formula" 
+
+  if (Config_getBool("USE_MATHJAX"))
+  {
+    QCString text = f->text();
+    bool closeInline = FALSE;
+    if (!bDisplay && !text.isEmpty() && text.at(0)=='$' && 
+                      text.at(text.length()-1)=='$')
+    {
+      closeInline=TRUE;
+      text = text.mid(1,text.length()-2);
+      m_t << "\\(";
+    }
+    m_t << convertToHtml(text);
+    if (closeInline)
+    {
+      m_t << "\\)";
+    }
+  }
+  else
+  {
+    m_t << "<img class=\"formula" 
       << (bDisplay ? "Dsp" : "Inl");
-  m_t << "\" alt=\"";
-  filterQuotedCdataAttr(f->text());
-  m_t << "\"";
-  /// @todo cache image dimensions on formula generation and give height/width
-  /// for faster preloading and better rendering of the page
-  m_t << " src=\"" << f->relPath() << f->name() << ".png\"/>";
+    m_t << "\" alt=\"";
+    filterQuotedCdataAttr(f->text());
+    m_t << "\"";
+    /// @todo cache image dimensions on formula generation and give height/width
+    /// for faster preloading and better rendering of the page
+    m_t << " src=\"" << f->relPath() << f->name() << ".png\"/>";
+
+  }
   if (bDisplay)
   {
     m_t << endl << "</p>" << endl;
@@ -518,7 +540,7 @@ void HtmlDocVisitor::visit(DocIndexEntry *e)
   //       e->scope()  ? e->scope()->name().data()  : "<null>",
   //       e->member() ? e->member()->name().data() : "<null>"
   //      );
-  Doxygen::indexList.addIndexItem(e->scope(),e->member(),anchor,e->entry());
+  Doxygen::indexList.addIndexItem(e->scope(),e->member(),e->entry());
 }
 
 void HtmlDocVisitor::visit(DocSimpleSectSep *)
@@ -638,14 +660,12 @@ static int getParagraphContext(DocPara *p,bool &isFirst,bool &isLast)
       case DocNode::Kind_AutoListItem:
         isFirst=TRUE;
         isLast =TRUE;
-        if (isFirst) t=1;
-        if (isLast)  t=3;
+        t=1; // not used
         break;
       case DocNode::Kind_SimpleListItem:
         isFirst=TRUE;
         isLast =TRUE;
-        if (isFirst) t=1;
-        if (isLast)  t=3;
+        t=1; // not used
         break;
       case DocNode::Kind_HtmlListItem:
         isFirst=isFirstChildNode((DocHtmlListItem*)p->parent(),p);
@@ -1172,7 +1192,8 @@ void HtmlDocVisitor::visitPre(DocImage *img)
     }
     m_t << "<div align=\"center\">" << endl;
     m_t << "<img src=\"" << img->relPath() << img->name() << "\" alt=\"" 
-      << baseName << "\"" << "/>" << endl;
+        << baseName << "\"" << htmlAttribsToString(img->attribs()) 
+        << "/>" << endl;
     if (img->hasCaption())
     {
       m_t << "<p><strong>";
@@ -1215,6 +1236,26 @@ void HtmlDocVisitor::visitPre(DocDotFile *df)
 }
 
 void HtmlDocVisitor::visitPost(DocDotFile *df) 
+{
+  if (m_hide) return;
+  if (df->hasCaption())
+  {
+    m_t << "</strong></p>" << endl;
+  }
+  m_t << "</div>" << endl;
+}
+
+void HtmlDocVisitor::visitPre(DocMscFile *df)
+{
+  if (m_hide) return;
+  writeMscFile(df->file(),df->relPath(),df->context());
+  m_t << "<div align=\"center\">" << endl;
+  if (df->hasCaption())
+  { 
+    m_t << "<p><strong>";
+  }
+}
+void HtmlDocVisitor::visitPost(DocMscFile *df) 
 {
   if (m_hide) return;
   if (df->hasCaption())
@@ -1312,25 +1353,33 @@ void HtmlDocVisitor::visitPre(DocParamSect *s)
   if (m_hide) return;
   forceEndParagraph(s);
   m_t << "<dl><dt><b>";
+  QCString className;
   switch(s->type())
   {
     case DocParamSect::Param: 
-      m_t << theTranslator->trParameters(); break;
+      m_t << theTranslator->trParameters(); 
+      className="params";
+      break;
     case DocParamSect::RetVal: 
-      m_t << theTranslator->trReturnValues(); break;
+      m_t << theTranslator->trReturnValues(); 
+      className="retval";
+      break;
     case DocParamSect::Exception: 
-      m_t << theTranslator->trExceptions(); break;
+      m_t << theTranslator->trExceptions(); 
+      className="exception";
+      break;
     case DocParamSect::TemplateParam: 
       /* TODO: add this 
       m_t << theTranslator->trTemplateParam(); break;
       */
       m_t << "Template Parameters"; break;
+      className="tparams";
     default:
       ASSERT(0);
   }
   m_t << ":";
   m_t << "</b></dt><dd>" << endl;
-  m_t << "  <table border=\"0\" cellspacing=\"2\" cellpadding=\"0\">" << endl;
+  m_t << "  <table class=\"" << className << "\">" << endl;
 }
 
 void HtmlDocVisitor::visitPost(DocParamSect *s)
@@ -1345,25 +1394,55 @@ void HtmlDocVisitor::visitPost(DocParamSect *s)
 void HtmlDocVisitor::visitPre(DocParamList *pl)
 {
   if (m_hide) return;
-  m_t << "    <tr><td valign=\"top\">";
-  if (pl->direction()!=DocParamSect::Unspecified)
+  m_t << "    <tr>";
+  DocParamSect *sect = 0;
+  if (pl->parent()->kind()==DocNode::Kind_ParamSect)
   {
-    m_t << "<tt>[";
-    if (pl->direction()==DocParamSect::In)
-    {
-      m_t << "in";
-    }
-    else if (pl->direction()==DocParamSect::Out)
-    {
-      m_t << "out";
-    }
-    else if (pl->direction()==DocParamSect::InOut)
-    {
-      m_t << "in,out";
-    }
-    m_t << "]</tt>&nbsp;";
+    sect=(DocParamSect*)pl->parent();
   }
-  m_t << "</td><td valign=\"top\"><em>";
+  if (sect && sect->hasInOutSpecifier())
+  {
+    m_t << "<td class=\"paramdir\">";
+    if (pl->direction()!=DocParamSect::Unspecified)
+    {
+      m_t << "[";
+      if (pl->direction()==DocParamSect::In)
+      {
+        m_t << "in";
+      }
+      else if (pl->direction()==DocParamSect::Out)
+      {
+        m_t << "out";
+      }
+      else if (pl->direction()==DocParamSect::InOut)
+      {
+        m_t << "in,out";
+      }
+      m_t << "]";
+    }
+    m_t << "</td>";
+  }
+  if (sect && sect->hasTypeSpecifier())
+  {
+    m_t << "<td class=\"paramtype\">";
+    QListIterator<DocNode> li(pl->paramTypes());
+    DocNode *type;
+    bool first=TRUE;
+    for (li.toFirst();(type=li.current());++li)
+    {
+      if (!first) m_t << "&#160;|&#160;"; else first=FALSE;
+      if (type->kind()==DocNode::Kind_Word)
+      {
+        visit((DocWord*)type); 
+      }
+      else if (type->kind()==DocNode::Kind_LinkedWord)
+      {
+        visit((DocLinkedWord*)type); 
+      }
+    }
+    m_t << "</td>";
+  }
+  m_t << "<td class=\"paramname\">";
   //QStrListIterator li(pl->parameters());
   //const char *s;
   QListIterator<DocNode> li(pl->parameters());
@@ -1381,7 +1460,7 @@ void HtmlDocVisitor::visitPre(DocParamList *pl)
       visit((DocLinkedWord*)param); 
     }
   }
-  m_t << "</em>&nbsp;</td><td>";
+  m_t << "</td><td>";
 }
 
 void HtmlDocVisitor::visitPost(DocParamList *)
@@ -1558,7 +1637,7 @@ void HtmlDocVisitor::writeDotFile(const QCString &fn,const QCString &relPath,
   m_t << "<img src=\"" << relPath << baseName << "." 
       << Config_getEnum("DOT_IMAGE_FORMAT") << "\" alt=\""
       << baseName << "\" border=\"0\" usemap=\"#" << mapName << "\">" << endl;
-  QCString imap = getDotImageMapFromFile(baseName,outDir,relPath,context);
+  QCString imap = getDotImageMapFromFile(fn,outDir,relPath,context);
   m_t << "<map name=\"" << mapName << "\" id=\"" << mapName << "\">" << imap << "</map>" << endl;
 }
 

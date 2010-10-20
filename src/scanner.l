@@ -107,6 +107,7 @@ static QCString         formulaText;
 static QCString         formulaEnd;
 static bool             useOverrideCommands = FALSE;
 
+static SrcLangExt       language;
 static bool             insideIDL   = FALSE;		//!< processing IDL code?
 static bool             insideJava  = FALSE;		//!< processing Java code?
 static bool             insideCS    = FALSE;		//!< processing C# code?
@@ -216,7 +217,8 @@ static void initEntry()
   current->mtype      = mtype;
   current->virt       = virt;
   current->stat       = gstat;
-  current->objc       = insideObjC;
+  current->lang       = language;
+  //printf("*** initEntry() language=%d\n",language);
   //if (!autoGroupStack.isEmpty())
   //{
   //  //printf("Appending group %s\n",autoGroupStack.top()->groupname.data());
@@ -325,14 +327,14 @@ static bool nameIsOperator(QCString &name)
 static void setContext()
 {
   QCString fileName = yyFileName;
-  SrcLangExt langExt = getLanguageFromFileName(fileName);
-  insideIDL  = langExt==SrcLangExt_IDL;
-  insideJava = langExt==SrcLangExt_Java;
-  insideCS   = langExt==SrcLangExt_CSharp; 
-  insideD    = langExt==SrcLangExt_D;
-  insidePHP  = langExt==SrcLangExt_PHP;
-  insideObjC = langExt==SrcLangExt_ObjC;
-  insideJS   = langExt==SrcLangExt_JS;
+  language   = getLanguageFromFileName(fileName);
+  insideIDL  = language==SrcLangExt_IDL;
+  insideJava = language==SrcLangExt_Java;
+  insideCS   = language==SrcLangExt_CSharp; 
+  insideD    = language==SrcLangExt_D;
+  insidePHP  = language==SrcLangExt_PHP;
+  insideObjC = language==SrcLangExt_ObjC;
+  insideJS   = language==SrcLangExt_JS;
   if ( insidePHP )
   {
     useOverrideCommands = TRUE;
@@ -565,6 +567,7 @@ FILE      ({FILESCHAR}*{FILEECHAR}+("."{FILESCHAR}*{FILEECHAR}+)*)|("\""[^\n\"]+
 ID        "$"?[a-z_A-Z\x80-\xFF][a-z_A-Z0-9\x80-\xFF]*
 SCOPEID   {ID}({ID}*{BN}*"::"{BN}*)*({ID}?)
 SCOPENAME "$"?(({ID}?{BN}*"::"{BN}*)*)(((~|!){BN}*)?{ID})
+PHPSCOPENAME ({ID}"\\")+{ID}
 TSCOPE    {ID}("<"[a-z_A-Z0-9 \t\*\&,]*">")?
 CSSCOPENAME (({ID}?{BN}*"."{BN}*)*)((~{BN}*)?{ID})
 PRE       [pP][rR][eE]
@@ -633,6 +636,8 @@ TYPEDEFPREFIX (("typedef"{BN}+)?)((("volatile"|"const"){BN}+)?)
 %x	Comment
 %x	PackageName
 %x	JavaImport
+%x	PHPUse
+%x	PHPUseAs
 %x	CSAccessorDecl
 %x	CSGeneric
 %x	PreLineCtrl
@@ -1022,7 +1027,8 @@ TYPEDEFPREFIX (("typedef"{BN}+)?)((("volatile"|"const"){BN}+)?)
 					    current->bodyLine  = yyLineNr;
 					    current->section = Entry::FUNCTION_SEC;
 					    current->protection = protection = Public ;
-					    current->objc = TRUE;
+					    language = current->lang = SrcLangExt_ObjC;
+					    insideObjC = TRUE;
 					    current->virt = Virtual;
 					    current->stat=yytext[0]=='+';
 					    current->mtype = mtype = Method;
@@ -1202,10 +1208,11 @@ TYPEDEFPREFIX (("typedef"{BN}+)?)((("volatile"|"const"){BN}+)?)
 <ObjCSkipStatement>";"			{
   					  BEGIN(FindMembers);
   					}
-<PackageName>{ID}("."{ID})*		{
+<PackageName>{ID}(("."|"\\"){ID})*	{
   					  isTypedef=FALSE;
 					  current->name = yytext;
 					  current->name = substitute(current->name,".","::");
+					  current->name = substitute(current->name,"\\","::");
 					  current->section = Entry::NAMESPACE_SEC;
 					  current->type = "namespace" ;
 					  current->fileName  = yyFileName;
@@ -1283,7 +1290,14 @@ TYPEDEFPREFIX (("typedef"{BN}+)?)((("volatile"|"const"){BN}+)?)
 					  current->startLine = yyLineNr;
 					  current->bodyLine  = yyLineNr;
 					  lineCount();
-  					  BEGIN( CompoundName ); 
+					  if (insidePHP)
+					  {
+					    BEGIN( PackageName );
+					  }
+					  else
+					  {
+  					    BEGIN( CompoundName ); 
+					  }
 					}
 <FindMembers>{B}*"module"{BN}+		{ 
 					  lineCount();
@@ -1350,7 +1364,8 @@ TYPEDEFPREFIX (("typedef"{BN}+)?)((("volatile"|"const"){BN}+)?)
 					  lineCount();
   					  isTypedef=FALSE;
 					  current->section = Entry::OBJCIMPL_SEC;
-					  current->objc = insideObjC = TRUE;
+					  language = current->lang = SrcLangExt_ObjC;
+					  insideObjC = TRUE;
 					  current->protection = protection = Public ;
 					  addType( current ) ;
 					  current->type += " implementation" ;
@@ -1364,7 +1379,11 @@ TYPEDEFPREFIX (("typedef"{BN}+)?)((("volatile"|"const"){BN}+)?)
   					  isTypedef=FALSE;
 					  current->section = Entry::CLASS_SEC;
                                           current->spec = Entry::Interface;
-					  current->objc = insideObjC = !insideJava;
+					  if (!insideJava)
+					  {
+					    language = current->lang = SrcLangExt_ObjC;
+					    insideObjC = TRUE;
+					  }
 					  current->protection = protection = Public ;
 					  addType( current ) ;
 					  current->type += " interface" ;
@@ -1378,7 +1397,8 @@ TYPEDEFPREFIX (("typedef"{BN}+)?)((("volatile"|"const"){BN}+)?)
   					  isTypedef=FALSE;
 					  current->section = Entry::CLASS_SEC;
                                           current->spec = Entry::Protocol;
-					  current->objc = insideObjC = TRUE;
+					  language = current->lang = SrcLangExt_ObjC;
+					  insideObjC = TRUE;
 					  current->protection = protection = Public ;
 					  addType( current ) ;
 					  current->type += " protocol" ;
@@ -1409,7 +1429,11 @@ TYPEDEFPREFIX (("typedef"{BN}+)?)((("volatile"|"const"){BN}+)?)
 					  current->fileName  = yyFileName;
 					  current->startLine = yyLineNr;
 					  current->bodyLine  = yyLineNr;
-					  current->objc = insideObjC = yytext[0]=='@';
+					  if (yytext[0]=='@')
+					  {
+					    language = current->lang = SrcLangExt_ObjC;
+					    insideObjC = TRUE;
+					  }
 					  lineCount() ;
 					  if (yytext[yyleng-1]=='{') unput('{');
 					  if (insidePHP && current->spec&Entry::Abstract)
@@ -1636,14 +1660,57 @@ TYPEDEFPREFIX (("typedef"{BN}+)?)((("volatile"|"const"){BN}+)?)
 <NSAliasArg>";"				{
   					  BEGIN( FindMembers );
   					}
+<PHPUse>({ID}{BN}*"\\"{BN}*)+{ID}	{
+  					  lineCount();
+					  aliasName=yytext;
+                                          //current->fileName = yyFileName; 
+  					  //current->section=Entry::USINGDIR_SEC;
+					  //current_root->addSubEntry(current);
+					  //current = new Entry;
+					  //initEntry();
+					  BEGIN(PHPUseAs);
+					}
+<PHPUseAs>{BN}+"as"{BN}+		{
+  					  lineCount();
+  					}
+<PHPUseAs>{ID}				{
+                                          Doxygen::namespaceAliasDict.insert(yytext,
+					       new QCString(removeRedundantWhiteSpace(
+						   substitute(aliasName,"\\","::"))));
+					  aliasName.resize(0);
+  					}
+<PHPUseAs>[,;]				{
+                                          if (!aliasName.isEmpty())
+					  {
+					    int i=aliasName.findRev('\\');
+					    QCString an = removeRedundantWhiteSpace(
+						    substitute(aliasName,"\\","::"));
+					    Doxygen::namespaceAliasDict.insert(aliasName.mid(i+1),
+						                        new QCString(an));
+					    current->name     = an;
+					    current->fileName = yyFileName; 
+					    current->section=Entry::USINGDECL_SEC;
+					    current_root->addSubEntry(current);
+					    current = new Entry ;
+					    initEntry();
+					  }
+					  if (*yytext==',')
+					  {
+					    BEGIN(PHPUse);
+					  }
+					  else
+					  {
+  					    BEGIN(FindMembers);
+					  }
+  					}
 <JavaImport>({ID}{BN}*"."{BN}*)+"*"	{ // package import => add as a using directive
   					  lineCount();
   					  QCString scope=yytext;
-					  current->name=removeRedundantWhiteSpace(substitute(scope.left(scope.length()-2),".","::"));
+					  current->name=removeRedundantWhiteSpace(substitute(scope.left(scope.length()-1),".","::"));
                                           current->fileName = yyFileName; 
   					  current->section=Entry::USINGDIR_SEC;
 					  current_root->addSubEntry(current);
-					  current = new Entry ;
+					  current = new Entry;
 					  initEntry();
 					  BEGIN(Using);
   					}
@@ -1770,6 +1837,7 @@ TYPEDEFPREFIX (("typedef"{BN}+)?)((("volatile"|"const"){BN}+)?)
 					  // *currentTemplateSpec+='>';
 					  if (--sharpCount<=0)
 					  {
+					    current->bodyLine = yyLineNr;
 					    current->args = "(";
 					    currentArgumentContext = FuncQual;
 					    fullArgString = current->args.copy();
@@ -1877,6 +1945,10 @@ TYPEDEFPREFIX (("typedef"{BN}+)?)((("volatile"|"const"){BN}+)?)
 					      BEGIN(NextSemi);
 					    else // insideJava or insideD
 					      BEGIN(JavaImport);
+					  }
+					  else if (insidePHP && strcmp(yytext,"use")==0)
+					  {
+					    BEGIN(PHPUse);
 					  }
 					  else if (insideJava && strcmp(yytext,"package")==0)
 					  {
@@ -2074,7 +2146,7 @@ TYPEDEFPREFIX (("typedef"{BN}+)?)((("volatile"|"const"){BN}+)?)
 					  BEGIN(DefineEnd);
   					}
 <DefineEnd>\n				{
-  					  //printf("End define\n");
+  					  //printf("End define: doc=%s docFile=%s docLine=%d\n",current->doc.data(),current->docFile.data(),current->docLine);
 					  yyLineNr++;
 					  current->fileName   = yyFileName;
 					  current->startLine  = yyLineNr;
@@ -2141,7 +2213,10 @@ TYPEDEFPREFIX (("typedef"{BN}+)?)((("volatile"|"const"){BN}+)?)
 					  }
   					}
 <FindMembers>[*&]+			{ 
-                                          current->name += yytext ;  
+  					  if (current->type.stripWhiteSpace().right(1)!=yytext)
+					  {
+                                            current->name += yytext ;  
+					  }
   					  addType( current );
 					}
 <FindMembers,MemberSpec,Function,NextSemi,BitFields,ReadInitializer,OldStyleArgs>";"{BN}*("/**"|"//!"|"/*!"|"///")"<" {
@@ -2702,6 +2777,7 @@ TYPEDEFPREFIX (("typedef"{BN}+)?)((("volatile"|"const"){BN}+)?)
 					    if (needNewCurrent)
 					    {
 					      current = new Entry(*current);
+					      initEntry();
 					    }
 					    current->name.resize(0);
 					    current->args.resize(0);
@@ -3066,8 +3142,12 @@ TYPEDEFPREFIX (("typedef"{BN}+)?)((("volatile"|"const"){BN}+)?)
 						}
 						else
 						{
-						  //current->doc.resize(0);
-						  //current->brief.resize(0);
+						  if (!isTypedef)
+						  {
+						    // enabled the next two lines for bug 623424
+						    current->doc.resize(0);
+						    current->brief.resize(0);
+						  }
 						  BEGIN( MemberSpec ) ;
 						}
 					      }
@@ -3130,6 +3210,7 @@ TYPEDEFPREFIX (("typedef"{BN}+)?)((("volatile"|"const"){BN}+)?)
 					  current_root->addSubEntry( current ) ;
 					  memspecEntry = current;
 					  current = new Entry(*current);
+					  initEntry();
 					  unput(';');
 					  BEGIN( MemberSpec ) ;
   					}
@@ -3167,6 +3248,13 @@ TYPEDEFPREFIX (("typedef"{BN}+)?)((("volatile"|"const"){BN}+)?)
 					    }
 					  }
 					}
+<MemberSpec>"("				{ // function with struct return type
+  					  addType(current);
+  					  current->name = msName;
+					  current->spec = 0;
+  					  unput('(');
+					  BEGIN(FindMembers);
+  					}
 <MemberSpec>[,;]			{
                                           //printf("current->name=`%s' msName=`%s'\n",current->name.data(),msName.data());
   					  if (msName.isEmpty() && !current->name.isEmpty())
@@ -3215,6 +3303,7 @@ TYPEDEFPREFIX (("typedef"{BN}+)?)((("volatile"|"const"){BN}+)?)
 					    else // case 2: create a typedef field
 					    {
 					      Entry *varEntry=new Entry;
+					      varEntry->lang = language;
 					      varEntry->protection = current->protection ;
 					      varEntry->mtype = current->mtype;
 					      varEntry->virt = current->virt;
@@ -3269,8 +3358,19 @@ TYPEDEFPREFIX (("typedef"{BN}+)?)((("volatile"|"const"){BN}+)?)
 					      current_root->addSubEntry(varEntry);
 					    }
 					  }
-					  if (*yytext==';')
+					  if (*yytext==';') // end of a struct/class ...
 					  {
+					    if (msName.isEmpty() && memspecEntry && (current->section&Entry::COMPOUND_MASK))
+					    { // case where a class/struct has a doc block after it
+					      if (!current->doc.isEmpty())
+					      {
+					        memspecEntry->doc += current->doc;
+					      }
+					      if (!current->brief.isEmpty())
+					      {
+					        memspecEntry->brief += current->brief;
+					      }
+				  	    }
 					    msType.resize(0);
 					    msName.resize(0);
 					    msArgs.resize(0);
@@ -3316,7 +3416,7 @@ TYPEDEFPREFIX (("typedef"{BN}+)?)((("volatile"|"const"){BN}+)?)
 <ReadBody,ReadNSBody,ReadBodyIntf>.	{ current->program += yytext ; }
 
 <FindMembers>"("/{BN}*"::"*{BN}*({TSCOPE}{BN}*"::")*{TSCOPE}{BN}*")"{BN}*"(" | /* typedef void (A<int>::func_t)(args...) */
-<FindMembers>("("({BN}*"::"*{BN}*{TSCOPE}{BN}*"::")*({BN}*[*&]{BN}*)+)+ {   /* typedef void (A::*ptr_t)(args...) or int (*func(int))[] */
+<FindMembers>("("({BN}*"::"*{BN}*{TSCOPE}{BN}*"::")*({BN}*[*&\^]{BN}*)+)+ {   /* typedef void (A::*ptr_t)(args...) or int (*func(int))[], the ^ is for Obj-C blocks */
   					  if (insidePHP) // reference parameter
 					  {
 					    REJECT
@@ -3351,7 +3451,7 @@ TYPEDEFPREFIX (("typedef"{BN}+)?)((("volatile"|"const"){BN}+)?)
 					  }
   					}
 <FuncPtr>.				{
-  					  //printf("Error: FuncPtr `%c' unexpected at line %d of %s\n",*yytext,yyLineNr,yyFileName);
+  					  //printf("error: FuncPtr `%c' unexpected at line %d of %s\n",*yytext,yyLineNr,yyFileName);
   					}
 <FuncPtrOperator>"("{BN}*")"{BN}*/"("	{
   					  current->name += yytext;
@@ -3676,7 +3776,7 @@ TYPEDEFPREFIX (("typedef"{BN}+)?)((("volatile"|"const"){BN}+)?)
 <CopyArgComment,CopyArgVerbatim>.	{ fullArgString+=*yytext; }
 <CopyArgComment>{CMD}("brief"|"short"){B}+ {
   					  warn(yyFileName,yyLineNr,
-					      "Warning: Ignoring %cbrief command inside argument documentation",*yytext
+					      "warning: Ignoring %cbrief command inside argument documentation",*yytext
 					     );
                                           fullArgString+=' ';
                                         }
@@ -4288,7 +4388,7 @@ TYPEDEFPREFIX (("typedef"{BN}+)?)((("volatile"|"const"){BN}+)?)
 					}
 <SkipInits>;	                        {
   					  warn(yyFileName,yyLineNr,
-					      "Warning: Found ';' while parsing initializer list! "
+					      "warning: Found ';' while parsing initializer list! "
 					      "(doxygen could be confused by a macro call without semicolon)"
 					     );
 					  BEGIN( FindMembers );
@@ -4357,6 +4457,7 @@ TYPEDEFPREFIX (("typedef"{BN}+)?)((("volatile"|"const"){BN}+)?)
 					  }
 					  else if (insideCS) // C# generic class
 					  {
+					    current->name+="-g"; 
 					    BEGIN( CSGeneric );
 					  }
 					  else // C++ template specialization
@@ -4377,9 +4478,10 @@ TYPEDEFPREFIX (("typedef"{BN}+)?)((("volatile"|"const"){BN}+)?)
 					  current->tArgLists->append(al);
 					  currentArgumentList = al;
 					  templateStr="<";
-					  current->name += "<";
+					  //current->name += "<";
 					  fullArgString = templateStr;
-					  copyArgString = &current->name;
+					  //copyArgString = &current->name;
+					  copyArgString = &templateStr;
 					  currentArgumentContext = ClassVar;
 					  BEGIN( ReadTempArgs );
   					}
@@ -4651,6 +4753,11 @@ TYPEDEFPREFIX (("typedef"{BN}+)?)((("volatile"|"const"){BN}+)?)
 					  {
 					    current->type.prepend("typedef");
 					  }
+					  if ((yytext[0]=='*' || yytext[0]=='&') && 
+					      current->section == Entry::ENUM_SEC)
+					  { // found "enum a *b" -> variable
+					    current->section = Entry::VARIABLE_SEC ;
+					  }
 					  BEGIN( FindMembers );
     					}
 <Bases,ClassVar>"///"/[^/]              {
@@ -4734,7 +4841,23 @@ TYPEDEFPREFIX (("typedef"{BN}+)?)((("volatile"|"const"){BN}+)?)
 <BasesProt>"private"{BN}+               { lineCount(); baseProt = Private; }
 <BasesProt>{BN}				{ lineCount(); }
 <BasesProt>.				{ unput(*yytext); BEGIN(Bases); }
+<Bases>("\\")?{BN}*({ID}{BN}*"\\"{BN}*)*{ID}	{ 
+                                          if (!insidePHP)
+					  {
+					    REJECT;
+					  }
+					  else // PHP base class of the form \Ns\Cl or Ns\Cl
+					  {
+  					    lineCount();
+					    QCString bn=yytext;
+					    bn = substitute(bn,"\\","::");
+					    baseName += bn;
+					    current->args += ' ';
+					    current->args += yytext;
+					  }
+                                        }
 <Bases>("::")?{BN}*({ID}{BN}*"::"{BN}*)*{ID}	{ 
+  					  lineCount();
                                           QCString baseScope = yytext;
                                           if (insideCS && baseScope.stripWhiteSpace()=="where")
 					  { 
@@ -4794,8 +4917,12 @@ TYPEDEFPREFIX (("typedef"{BN}+)?)((("volatile"|"const"){BN}+)?)
 					  }
 					  else // template specialization
 					  {
-                                            baseName += *yytext;
-					    specName = &baseName;
+					    //if (insideCS) // generic
+					    //{
+					    //  baseName+="-g";
+					    //}
+                                            templateStr = yytext;
+					    specName = &templateStr;
 					    BEGIN ( Specialization );
 					  }
 					}
@@ -4805,7 +4932,24 @@ TYPEDEFPREFIX (("typedef"{BN}+)?)((("volatile"|"const"){BN}+)?)
 <Specialization>">"			{
   					  *specName += *yytext;
   					  if (roundCount==0 && --sharpCount<=0)
+					  {
+					    if (1 /*!insideCS*/) 
+					    {
+					      baseName+=*specName;
+					    }
+					    else
+					    {
+					      if (current->tArgLists==0)
+					      {
+						current->tArgLists = new QList<ArgumentList>;
+						current->tArgLists->setAutoDelete(TRUE);
+					      }
+					      ArgumentList *al = new ArgumentList;
+					      current->tArgLists->append(al);
+					      stringToArgumentList(*specName,al);
+					    }
 					    BEGIN(lastSkipSharpContext);
+					  }
   					}
 <Specialization>{BN}+			{ lineCount(); *specName +=' '; }
 <Specialization>"<<"			{ *specName += yytext; }
@@ -5121,7 +5265,7 @@ TYPEDEFPREFIX (("typedef"{BN}+)?)((("volatile"|"const"){BN}+)?)
  /* ---- Single line comments ------ */
 <DocLine>[^\n]*"\n"[ \t]*"//"[/!]       { // continuation of multiline C++-style comment
 				           docBlock+=yytext;
-          		                   docBlock.resize(docBlock.size() - 3);
+          		                   docBlock.resize(docBlock.length() - 3);
 					   yyLineNr++;
                                         }
 <DocLine>[^\n]*/"\n"			{ // whole line
@@ -5240,7 +5384,7 @@ TYPEDEFPREFIX (("typedef"{BN}+)?)((("volatile"|"const"){BN}+)?)
   					}
 <DocCopyBlock><<EOF>>			{
   					  warn(yyFileName,yyLineNr,
-					      "Warning: reached end of file while inside a %s block!\n"
+					      "warning: reached end of file while inside a %s block!\n"
 					      "The command that should end the block seems to be missing!\n",
 					      docBlockName.data());
   					  yyterminate();
@@ -5399,7 +5543,7 @@ static void handleCommentBlock(const QCString &doc,bool brief)
   int position=0;
   bool needsEntry=FALSE;
   if (docBlockInBody && hideInBodyDocs) return;
-  //printf("parseCommentBlock [%s]\n",doc.data());
+  //printf("parseCommentBlock [%s] brief=%d\n",doc.data(),brief);
   int lineNr = brief ? current->briefLine : current->docLine;   // line of block start
   while (parseCommentBlock(
 	g_thisParser,
@@ -5407,9 +5551,9 @@ static void handleCommentBlock(const QCString &doc,bool brief)
 	doc,        // text
 	yyFileName, // file
 	lineNr,     // line of block start
-	docBlockInBody ? FALSE : brief, 
-	docBlockInBody ? FALSE : docBlockAutoBrief,
-	docBlockInBody,
+	docBlockInBody ? FALSE : brief,               // isBrief
+	docBlockInBody ? FALSE : docBlockAutoBrief,   // isJavaDocStyle
+	docBlockInBody,                               // isInBody
 	protection,
         position,
         needsEntry
@@ -5417,7 +5561,13 @@ static void handleCommentBlock(const QCString &doc,bool brief)
      ) 
   {
     //printf("parseCommentBlock position=%d [%s]\n",position,doc.data()+position);
-    if (needsEntry) newEntry();
+    if (needsEntry) 
+    {
+      QCString docFile = current->docFile;
+      newEntry();
+      current->docFile = docFile;
+      current->docLine = lineNr;
+    }
   }
   if (needsEntry)
   {
@@ -5516,11 +5666,12 @@ static void parseCompounds(Entry *rt)
       yyFileName = ce->fileName;
       //setContext();
       yyLineNr = ce->startLine ;
-      insideObjC = ce->objc;
+      insideObjC = ce->lang==SrcLangExt_ObjC;
       //printf("---> Inner block starts at line %d objC=%d\n",yyLineNr,insideObjC);
       //current->reset();
       if (current) delete current;
       current = new Entry;
+      current->lang = language;
       gstat = FALSE;
       int ni=ce->name.findRev("::"); if (ni==-1) ni=0; else ni+=2;
       // set default protection based on the compound type
@@ -5537,7 +5688,7 @@ static void parseCompounds(Entry *rt)
 	}
 	else if (ce->spec&(Entry::Interface | Entry::Ref | Entry::Value | Entry::Struct | Entry::Union))
 	{
-	  if (ce->objc)
+	  if (ce->lang==SrcLangExt_ObjC)
 	  {
 	    current->protection = protection = Protected ;
 	  }
@@ -5620,6 +5771,7 @@ static void parseMain(const char *fileName,const char *fileBuf,Entry *rt)
     yyLineNr= 1 ; 
     yyFileName = fileName;
     setContext();
+    rt->lang = language;
     msg("Parsing file %s...\n",yyFileName.data());
 
     current_root  = rt ;
@@ -5663,7 +5815,12 @@ static void parseMain(const char *fileName,const char *fileBuf,Entry *rt)
     //}
 
     rt->program.resize(0);
-    delete current; current=0;
+    if (rt->children()->contains(current)==0) 
+      // it could be that current is already added as a child to rt, so we
+      // only delete it if this is not the case. See bug 635317.
+    {
+      delete current; current=0;
+    }
 
     parseCompounds(rt);
 

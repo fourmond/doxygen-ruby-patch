@@ -152,12 +152,13 @@ div.ah {
 	font-weight: bold;
 	color: #ffffff;
 	margin-bottom: 3px;
-	margin-top: 3px
-	padding: .2em;
+	margin-top: 3px;
+	padding: 0.2em;
 	border: solid thin #333;
-	border-radius: .5em;
+	border-radius: 0.5em;
 	-webkit-border-radius: .5em;
 	-moz-border-radius: .5em;
+	box-shadow: 2px 2px 3px #999;
 	-webkit-box-shadow: 2px 2px 3px #999;
 	-moz-box-shadow: rgba(0, 0, 0, 0.15) 2px 2px 2px;
 	background-image: -webkit-gradient(linear, left top, left bottom, from(#eee), to(#000),color-stop(0.3, #444));
@@ -167,7 +168,6 @@ div.ah {
 div.groupHeader {
 	margin-left: 16px;
 	margin-top: 12px;
-	margin-bottom: 6px;
 	font-weight: bold;
 }
 
@@ -376,7 +376,7 @@ table.memberdecls {
 	font-size: 80%;
 	color: ##60;
 	font-weight: normal;
-	margin-left: 3px;
+	margin-left: 9px;
 }
 
 .memnav {
@@ -407,6 +407,10 @@ table.memberdecls {
         color: ##2b;
         font-weight: bold;
         text-shadow: 0px 1px 1px rgba(255, 255, 255, 0.9);
+        /* opera specific markup */
+        box-shadow: 5px 5px 5px rgba(0, 0, 0, 0.15);
+        border-top-right-radius: 8px;
+        border-top-left-radius: 8px;
         /* firefox specific markup */
         -moz-box-shadow: rgba(0, 0, 0, 0.15) 5px 5px 5px;
         -moz-border-radius-topright: 8px;
@@ -428,16 +432,20 @@ table.memberdecls {
         padding: 2px 5px;
         background-color: ##FC;
         border-top-width: 0;
+        /* opera specific markup */
+        border-bottom-left-radius: 8px;
+        border-bottom-right-radius: 8px;
+        box-shadow: 5px 5px 5px rgba(0, 0, 0, 0.15);
         /* firefox specific markup */
         -moz-border-radius-bottomleft: 8px;
         -moz-border-radius-bottomright: 8px;
         -moz-box-shadow: rgba(0, 0, 0, 0.15) 5px 5px 5px;
-        background-image: -moz-linear-gradient(center top, ##FF 0%, ##FF 60%, #F8 95%, #F0);
+        background-image: -moz-linear-gradient(center top, ##FF 0%, ##FF 60%, ##F8 95%, ##F0);
         /* webkit specific markup */
         -webkit-border-bottom-left-radius: 8px;
         -webkit-border-bottom-right-radius: 8px;
         -webkit-box-shadow: 5px 5px 5px rgba(0, 0, 0, 0.15);
-        background-image: -webkit-gradient(linear,center top,center bottom,from(##FF), color-stop(0.6,##FF), color-stop(0.60,#FF), color-stop(0.95,#F8), to(#F0));
+        background-image: -webkit-gradient(linear,center top,center bottom,from(##FF), color-stop(0.6,##FF), color-stop(0.60,##FF), color-stop(0.95,##F8), to(##F0));
 }
 
 .paramkey {
@@ -455,6 +463,28 @@ table.memberdecls {
 .paramname em {
 	font-style: normal;
 }
+
+.params, .retval, .exception, .tparams {
+        border-spacing: 6px 2px;
+}       
+
+.params .paramname, .retval .paramname {
+        font-weight: bold;
+        vertical-align: top;
+}
+        
+.params .paramtype {
+        font-style: italic;
+        vertical-align: top;
+}       
+        
+.params .paramdir {
+        font-family: "courier new",courier,monospace;
+        vertical-align: top;
+}
+
+
+
 
 /* @end */
 

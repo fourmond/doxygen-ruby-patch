@@ -105,7 +105,7 @@ void ManDocVisitor::visit(DocSymbol *s)
     case DocSymbol::Ring:    m_t << s->letter() << "\\*o"; break;
     case DocSymbol::Nbsp:    m_t << " "; break;
     default:
-                             err("Error: unknown symbol found\n");
+                             err("error: unknown symbol found\n");
   }
   m_firstCol=FALSE;
 }
@@ -718,6 +718,14 @@ void ManDocVisitor::visitPre(DocDotFile *)
 void ManDocVisitor::visitPost(DocDotFile *) 
 {
 }
+void ManDocVisitor::visitPre(DocMscFile *)
+{
+}
+
+void ManDocVisitor::visitPost(DocMscFile *) 
+{
+}
+
 
 void ManDocVisitor::visitPre(DocLink *)
 {

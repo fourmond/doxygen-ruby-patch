@@ -66,7 +66,7 @@ class HtmlHelpIndex
     void addItem(const char *first,const char *second, 
                  const char *url, const char *anchor,
                  bool hasLink,bool reversed);
-    void writeFields(QTextStream &t);
+    void writeFields(FTextStream &t);
   private:
     IndexFieldSDict *dict;   
 };
@@ -147,7 +147,7 @@ void HtmlHelpIndex::addItem(const char *level1,const char *level2,
  *      b1     -> link to url#anchor 
  *  </pre>
  */
-void HtmlHelpIndex::writeFields(QTextStream &t)
+void HtmlHelpIndex::writeFields(FTextStream &t)
 {
   dict->sort();
   IndexFieldSDict::Iterator ifli(*dict);
@@ -305,7 +305,6 @@ void HtmlHelp::initialize()
   }
   /* Write the header of the contents file */
   cts.setDevice(cf);
-  cts.setEncoding(QTextStream::Latin1);
   cts << "<!DOCTYPE HTML PUBLIC \"-//IETF//DTD HTML//EN\">\n"
          "<HTML><HEAD></HEAD><BODY>\n"
          "<OBJECT type=\"text/site properties\">\n"
@@ -323,7 +322,6 @@ void HtmlHelp::initialize()
   }
   /* Write the header of the contents file */
   kts.setDevice(kf);
-  kts.setEncoding(QTextStream::Latin1);
   kts << "<!DOCTYPE HTML PUBLIC \"-//IETF//DTD HTML//EN\">\n"
          "<HTML><HEAD></HEAD><BODY>\n"
          "<OBJECT type=\"text/site properties\">\n"
@@ -446,12 +444,7 @@ void HtmlHelp::createProjectFile()
   QFile f(fName);
   if (f.open(IO_WriteOnly))
   {
-    QTextStream t(&f);
-#if QT_VERSION >= 200
-    t.setEncoding(QTextStream::Latin1);
-#endif
-
-   
+    FTextStream t(&f);
     
     QCString indexName="index"+Doxygen::htmlFileExtension;
     if (Config_getBool("GENERATE_TREEVIEW")) indexName="main"+Doxygen::htmlFileExtension;
@@ -490,6 +483,7 @@ void HtmlHelp::createProjectFile()
       t << s << endl;
       s = indexFiles.next();
     }
+    // items not found by the html help compiler scan.
     t << "tabs.css" << endl;
     t << "tab_a.png" << endl;
     t << "tab_b.png" << endl;
@@ -497,10 +491,11 @@ void HtmlHelp::createProjectFile()
     t << "tab_s.png" << endl;
     t << "nav_h.png" << endl;
     t << "nav_f.png" << endl;
+    t << "bc_s.png" << endl;
     if (Config_getBool("HTML_DYNAMIC_SECTIONS"))
     {
-      t << "open.gif" << endl;
-      t << "closed.gif" << endl;
+      t << "open.png" << endl;
+      t << "closed.png" << endl;
     }
     f.close();
   }
@@ -634,7 +629,7 @@ void HtmlHelp::addContentsItem(bool isDir,
 
 
 void HtmlHelp::addIndexItem(Definition *context,MemberDef *md,
-                            const char *anc,const char *word)
+                            const char *word)
 {
   if (md)
   {
@@ -654,14 +649,14 @@ void HtmlHelp::addIndexItem(Definition *context,MemberDef *md,
     QCString level2  = md->name();
     QCString contRef = separateMemberPages ? cfname : cfiname;
     QCString memRef  = cfname;
-    QCString anchor  = anc;
+    QCString anchor  = md->anchor();
     index->addItem(level1,level2,contRef,anchor,TRUE,FALSE);
     index->addItem(level2,level1,memRef,anchor,TRUE,TRUE);
   }
   else if (context)
   {
     QCString level1  = word ? QCString(word) : context->name();
-    index->addItem(level1,0,context->getOutputFileBase(),anc,TRUE,FALSE);
+    index->addItem(level1,0,context->getOutputFileBase(),0,TRUE,FALSE);
   }
 }
 
