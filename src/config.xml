@@ -427,6 +427,14 @@ Note: This option is not very useful if HIDE_SCOPE_NAMES is set to YES.
 Note: This option applies only to the class list, not to the 
 alphabetical list. 
 ' defval='0'/>
+    <option type='bool' id='STRICT_PROTO_MATCHING' docs='
+If the STRICT_PROTO_MATCHING option is enabled and doxygen fails to
+do proper type resolution of all parameters of a function it will reject a 
+match between the prototype and the implementation of a member function even
+if there is only one candidate or it is obvious which candidate to choose
+by doing a simple string match. By disabling STRICT_PROTO_MATCHING doxygen 
+will still accept a match between prototype and implementation in such cases.
+' defval='0'/>
     <option type='bool' id='GENERATE_TODOLIST' docs='
 The GENERATE_TODOLIST tag can be used to enable (YES) or 
 disable (NO) the todo list. This list is created by putting \todo 
@@ -670,8 +678,8 @@ The FILTER_PATTERNS tag can be used to specify filters on a per file pattern
 basis.  Doxygen will compare the file name with each pattern and apply the 
 filter if there is a match.  The filters are a list of the form: 
 pattern=filter (like *.cpp=my_cpp_filter). See INPUT_FILTER for further 
-info on how filters are used. If FILTER_PATTERNS is empty, INPUT_FILTER 
-is applied to all files. 
+info on how filters are used. If FILTER_PATTERNS is empty or if 
+non of the patterns match the file name, INPUT_FILTER is applied. 
 '>
     </option>
     <option type='bool' id='FILTER_SOURCE_FILES' docs='
@@ -679,6 +687,13 @@ If the FILTER_SOURCE_FILES tag is set to YES, the input filter (if set using
 INPUT_FILTER) will be used to filter the input files when producing source 
 files to browse (i.e. when SOURCE_BROWSER is set to YES). 
 ' defval='0'/>
+    <option type='list' id='FILTER_SOURCE_PATTERNS' format='file' docs='
+The FILTER_SOURCE_PATTERNS tag can be used to specify source filters per file 
+pattern. A pattern will override the setting for FILTER_PATTERN (if any) 
+and it is also possible to disable source filtering for a specific pattern 
+using *.ext= (so without naming a filter). This option only has effect when 
+FILTER_SOURCE_FILES is enabled.
+' depends='FILTER_SOURCE_FILES'/>
   </group>
   <group name='Source Browser' docs='configuration options related to source browsing'>
     <option type='bool' id='SOURCE_BROWSER' docs='
@@ -1274,15 +1289,15 @@ instead of the = operator.
 If the MACRO_EXPANSION and EXPAND_ONLY_PREDEF tags are set to YES then 
 this tag can be used to specify a list of macro names that should be expanded. 
 The macro definition that is found in the sources will be used. 
-Use the PREDEFINED tag if you want to use a different macro definition. 
+Use the PREDEFINED tag if you want to use a different macro definition that
+overrules the definition found in the source code. 
 ' depends='ENABLE_PREPROCESSING'>
     </option>
     <option type='bool' id='SKIP_FUNCTION_MACROS' docs='
 If the SKIP_FUNCTION_MACROS tag is set to YES (the default) then 
-doxygen&apos;s preprocessor will remove all function-like macros that are alone 
-on a line, have an all uppercase name, and do not end with a semicolon. Such 
-function macros are typically used for boiler-plate code, and will confuse 
-the parser if not removed. 
+doxygen&apos;s preprocessor will remove all references to function-like macros 
+that are alone on a line, have an all uppercase name, and do not end with a 
+semicolon, because these will confuse the parser if not removed. 
 ' defval='1' depends='ENABLE_PREPROCESSING'/>
   </group>
   <group name='External' docs='Configuration::additions related to external references'>
@@ -1357,15 +1372,14 @@ explicitly to a value larger than 0 to get control over the balance
 between CPU load and processing speed.  
 ' defval='0' minval='0' maxval='32'/>
     <option type='string' id='DOT_FONTNAME' format='string' docs='
-By default doxygen will write a font called FreeSans.ttf to the output 
-directory and reference it in all dot files that doxygen generates. This 
-font does not include all possible unicode characters however, so when you need 
-these (or just want a differently looking font) you can specify the font name 
+By default doxygen will write a font called Helvetica to the output 
+directory and reference it in all dot files that doxygen generates. 
+When you want a differently looking font you can specify the font name 
 using DOT_FONTNAME. You need need to make sure dot is able to find the font, 
 which can be done by putting it in a standard location or by setting the 
 DOTFONTPATH environment variable or by setting DOT_FONTPATH to the directory 
 containing the font. 
-' defval='FreeSans.ttf' depends='HAVE_DOT'/>
+' defval='Helvetica' depends='HAVE_DOT'/>
     <option type='int' id='DOT_FONTSIZE' docs='
 The DOT_FONTSIZE tag can be used to set the size of the font of dot graphs. 
 The default size is 10pt. 
@@ -1445,6 +1459,7 @@ If left blank png will be used.
       <value name='png'/>
       <value name='jpg'/>
       <value name='gif'/>
+      <value name='svg'/>
     </option>
     <option type='string' id='DOT_PATH' format='dir' docs='
 The tag DOT_PATH can be used to specify the path where the dot tool can be 

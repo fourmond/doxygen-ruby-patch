@@ -210,7 +210,11 @@ B         [ \t]
 BS        [ \t]*
 BS_       [ \t]+
 COMMA     {BS},{BS}
-ARGS      {BS}("("[^)]*")")
+ARGS_L0   ("("[^)]*")")
+ARGS_L1a  [^()]*"("[^)]*")"[^)]*
+ARGS_L1   ("("{ARGS_L1a}*")")
+ARGS_L2   "("({ARGS_L0}|[^()]|{ARGS_L1a}|{ARGS_L1})*")"
+ARGS      {BS}({ARGS_L0}|{ARGS_L1}|{ARGS_L2})
 NOARGS    {BS}"\n"
 
 NUM_TYPE  (complex|integer|logical|real)
@@ -377,6 +381,7 @@ PREFIX    (RECURSIVE{BS_}|PURE{BS_}|ELEMENTAL{BS_}){0,2}(RECURSIVE|PURE|ELEMENTA
   					  current->section=Entry::USINGDIR_SEC;
 					  current_root->addSubEntry(current);
 					  current = new Entry;
+                                          current->lang    = SrcLangExt_F90; 
                                           yy_pop_state();
                                         }
 <Use>{ID}/,                             { 
@@ -391,6 +396,7 @@ PREFIX    (RECURSIVE{BS_}|PURE{BS_}|ELEMENTAL{BS_}){0,2}(RECURSIVE|PURE|ELEMENTA
   					  current->section=Entry::USINGDECL_SEC;
 					  current_root->addSubEntry(current);
 					  current = new Entry ;
+                                          current->lang    = SrcLangExt_F90; 
   					}
 <Use,UseOnly>"\n"                       {
                                           unput(*yytext);
@@ -398,7 +404,7 @@ PREFIX    (RECURSIVE{BS_}|PURE{BS_}|ELEMENTAL{BS_}){0,2}(RECURSIVE|PURE|ELEMENTA
                                         }
 
  /*------ ignore special fortran statements */
-<Start,ModuleBody,SubprogBody>^[ \t]*interface({BS_}{ID}({BS}\({BS}[^ \t()]+{BS}\))?)?/{BS}(!|\n) { // handle interface block
+<Start,ModuleBody,SubprogBody>^[ \t]*interface({BS_}{ID}({ARGS}?)?)?/{BS}(!|\n) { // handle interface block
                                           if(YY_START == Start)
                                           {
                                             addModule(NULL); 
@@ -417,7 +423,7 @@ PREFIX    (RECURSIVE{BS_}|PURE{BS_}|ELEMENTAL{BS_}){0,2}(RECURSIVE|PURE|ELEMENTA
 					  yy_push_state(InterfaceBody);
  					  startScope(last_entry);
                                         }
-<InterfaceBody>^{BS}"end"({BS}"interface"({BS_}{ID})?)?{BS}/(\n|!)   {
+<InterfaceBody>^{BS}"end"({BS}"interface"({BS_}{ID}{ARGS}?)?)?{BS}/(\n|!) {
 					  if (!endScope(current_root))
 					    yyterminate();
 					  yy_pop_state();
@@ -521,7 +527,7 @@ PREFIX    (RECURSIVE{BS_}|PURE{BS_}|ELEMENTAL{BS_}){0,2}(RECURSIVE|PURE|ELEMENTA
 
  /*------- module/global/typedef variable ---------------------------------------------------*/
 
-<SubprogBody,SubprogBodyContains>^{BS}"end"({BS}{SUBPROG}({BS_}{ID})?)?{BS}/(\n|!) {  
+<SubprogBody,SubprogBodyContains>^{BS}[0-9]*{BS}"end"({BS}{SUBPROG}({BS_}{ID})?)?{BS}/(\n|!) {  
                                            //fprintf(stderr,"1e=========> got end subprog: %s\n", yytext);
 
                                            /* args is used for parameters in list of functions, argList for 
@@ -690,7 +696,7 @@ PREFIX    (RECURSIVE{BS_}|PURE{BS_}|ELEMENTAL{BS_}){0,2}(RECURSIVE|PURE|ELEMENTA
 		                           // TYPE_SPEC is for old function style function result
                                            result= yytext;
                                            result= result.stripWhiteSpace();
-                                           extractPrefix(result);
+                                           //extractPrefix(result);
                                            //fprintf(stderr, "===%s\n", (const char*)result);
   					   current->type = result;
                                            yy_push_state(SubprogPrefix);
@@ -706,7 +712,7 @@ PREFIX    (RECURSIVE{BS_}|PURE{BS_}|ELEMENTAL{BS_}){0,2}(RECURSIVE|PURE|ELEMENTA
                                          // Fortran subroutine or function found
                                          result= yytext;
                                          result= result.stripWhiteSpace();
-                                         extractPrefix(result);
+                                         //extractPrefix(result);
                                          addSubprogram(result);
                                          yy_push_state(Subprog);
                                        }
@@ -835,7 +841,9 @@ PREFIX    (RECURSIVE{BS_}|PURE{BS_}|ELEMENTAL{BS_}){0,2}(RECURSIVE|PURE|ELEMENTA
 %%
 //----------------------------------------------------------------------------
 
-static void extractPrefix(QCString &text) {
+#if 0
+static void extractPrefix(QCString &text) 
+{
   int prefixIndex = 0;
   int curIndex = 0;
   bool cont = TRUE;
@@ -854,6 +862,7 @@ static void extractPrefix(QCString &text) {
     }
   }
 }
+#endif
 
 static int getAmpersandAtTheStart(const char *buf, int length)
 {
@@ -1327,6 +1336,16 @@ static QCString applyModifiers(QCString typeName, SymbolModifiers& mdfs)
     typeName += ",";
     typeName += "save";
   }
+  if (mdfs.protection == SymbolModifiers::PUBLIC)
+  {
+    typeName += ",";
+    typeName += "public";
+  }
+  else if (mdfs.protection == SymbolModifiers::PRIVATE)
+  {
+    typeName += ",";
+    typeName += "private";
+  }
 
   return typeName;
 }
@@ -1485,6 +1504,7 @@ static void initEntry()
   current->mtype      = mtype;
   current->virt       = virt;
   current->stat       = gstat;
+  current->lang       = SrcLangExt_F90; 
   initGroupInfo(current);
 }
 
@@ -1706,11 +1726,13 @@ static void parseMain(const char *fileName,const char *fileBuf,Entry *rt)
     groupEnterFile(yyFileName,yyLineNr);
 
     current          = new Entry;
+    current->lang    = SrcLangExt_F90; 
     current->name    = yyFileName;
     current->section = Entry::SOURCE_SEC;
     current_root->addSubEntry(current);
     file_root        = current;
     current          = new Entry;
+    current->lang    = SrcLangExt_F90; 
 
     fscanYYrestart( fscanYYin );
     {

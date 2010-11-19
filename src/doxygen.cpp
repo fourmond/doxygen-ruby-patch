@@ -2198,8 +2198,9 @@ static MemberDef *addVariableToFile(
  *  \returns -1 if this is not a function pointer variable or
  *           the index at which the brace of (...*name) was found.
  */
-static int findFunctionPtr(const QCString &type,int *pLength=0)
+static int findFunctionPtr(const QCString &type,int lang, int *pLength=0)
 {
+  if (lang == SrcLangExt_F90) return -1; // Fortran does not have function pointers
   static const QRegExp re("([^)]*[\\*\\^][^)]*)");
   int i=-1,l;
   if (!type.isEmpty() &&             // return type is non-empty
@@ -2382,7 +2383,7 @@ static void addVariable(EntryNav *rootNav,int isFuncPtr=-1)
     else
     {
       int i=isFuncPtr;
-      if (i==-1) i=findFunctionPtr(root->type); // for typedefs isFuncPtr is not yet set
+      if (i==-1) i=findFunctionPtr(root->type,root->lang); // for typedefs isFuncPtr is not yet set
       if (i!=-1) // function pointer
       {
         int ai = root->type.find('[',i);
@@ -2594,7 +2595,7 @@ static void buildVarList(EntryNav *rootNav)
        (rootNav->section()==Entry::VARIABLE_SEC    // it's a variable
        ) ||
        (rootNav->section()==Entry::FUNCTION_SEC && // or maybe a function pointer variable 
-        (isFuncPtr=findFunctionPtr(rootNav->type()))!=-1
+        (isFuncPtr=findFunctionPtr(rootNav->type(),rootNav->lang()))!=-1
        ) ||
        (rootNav->section()==Entry::FUNCTION_SEC && // class variable initialized by constructor
         isVarWithConstructor(rootNav)
@@ -3921,7 +3922,7 @@ static bool findTemplateInstanceRelation(Entry *root,
   //  int *tempArgIndex;
   //  for (;(tempArgIndex=qdi.current());++qdi)
   //  {
-  //    printf("(%s->%d) ",qdi.currentKey().data(),*tempArgIndex);
+  //    printf("(%s->%d) ",qdi.currentKey(),*tempArgIndex);
   //  }
   //}
   //printf("\n");
@@ -5651,24 +5652,51 @@ static void findMember(EntryNav *rootNav,
           if (count==0 && !(isFriend && funcType=="class"))
           {
             int candidates=0;
+            ClassDef *ccd = 0, *ecd = 0;
+            MemberDef *cmd = 0, *emd = 0;
             if (mn->count()>0)
             {
               //printf("Assume template class\n");
               for (mni.toFirst();(md=mni.current());++mni)
               {
-                ClassDef *cd=md->getClassDef();
-                //printf("cd->name()==%s className=%s\n",cd->name().data(),className.data());
-                if (cd!=0 && rightScopeMatch(cd->name(),className)) 
+                ccd=md->getClassDef();
+                cmd=md;
+                //printf("ccd->name()==%s className=%s\n",ccd->name().data(),className.data());
+                if (ccd!=0 && rightScopeMatch(ccd->name(),className)) 
                 {
                   LockingPtr<ArgumentList> templAl = md->templateArguments();
                   if (root->tArgLists && templAl!=0 &&
                       root->tArgLists->getLast()->count()<=templAl->count())
                   { 
-                    addMethodToClass(rootNav,cd,md->name(),isFriend);
+                    addMethodToClass(rootNav,ccd,md->name(),isFriend);
                     return;
+                  }
+                  if (md->argsString()==argListToString(root->argList,TRUE,FALSE))
+                  { // exact argument list match -> remember
+                    ecd = ccd;
+                    emd = cmd;
                   }
                   candidates++;
                 }
+              }
+            }
+            static bool strictProtoMatching = Config_getBool("STRICT_PROTO_MATCHING");
+            if (!strictProtoMatching)
+            {
+              if (candidates==1 && ccd && cmd)
+              {
+                // we didn't find an actual match on argument lists, but there is only 1 member with this
+                // name in the same scope, so that has to be the one. 
+                addMemberDocs(rootNav,cmd,funcDecl,0,overloaded,0);
+                return;
+              }
+              else if (candidates>1 && ecd && emd)
+              {
+                // we didn't find a unique match using type resolution, 
+                // but one of the matches has the exact same signature so
+                // we take that one.
+                addMemberDocs(rootNav,emd,funcDecl,0,overloaded,0);
+                return;
               }
             }
 
@@ -6165,7 +6193,7 @@ static void filterMemberDocumentation(EntryNav *rootNav)
   }
 
   if ( // detect func variable/typedef to func ptr
-      (i=findFunctionPtr(root->type,&l))!=-1 
+      (i=findFunctionPtr(root->type,root->lang,&l))!=-1 
      )
   {
     //printf("Fixing function pointer!\n");
@@ -10395,6 +10423,7 @@ void generateOutput()
   // what categories we find in this function.
   if (Config_getBool("GENERATE_HTML") && searchEngine)
   {
+    msg("Generating search indices...\n");
     QCString searchDirName = Config_getString("HTML_OUTPUT")+"/search";
     QDir searchDir(searchDirName);
     if (!searchDir.exists() && !searchDir.mkdir(searchDirName))

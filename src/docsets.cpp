@@ -344,6 +344,16 @@ void DocSets::addIndexItem(Definition *context,MemberDef *md,const char *)
       case MemberDef::Event:
         type="event"; break;
     }
+    cd = md->getClassDef();
+    nd = md->getNamespaceDef();
+    if (cd) 
+    {
+      scope = cd->qualifiedName();
+    }
+    else if (nd)
+    {
+      scope = nd->name();
+    }
     writeToken(m_tts,md,type,lang,scope,md->anchor());
   }
   else if (context && context->isLinkable())
@@ -405,7 +415,7 @@ void DocSets::addIndexItem(Definition *context,MemberDef *md,const char *)
     }
     if (m_scopes.find(context->getOutputFileBase())==0)
     {
-      writeToken(m_tts,context,type,lang,0,0,decl);
+      writeToken(m_tts,context,type,lang,scope,0,decl);
       m_scopes.append(context->getOutputFileBase(),(void*)0x8);
     }
   }

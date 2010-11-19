@@ -2099,7 +2099,12 @@ TYPEDEFPREFIX (("typedef"{BN}+)?)((("volatile"|"const"){BN}+)?)
                                           yyLineNr = atoi(&yytext[1]);
 					  //printf("setting line number to %d\n",yyLineNr);
 					  lastPreLineCtrlContext = YY_START;
-  					  current->program+=yytext;
+					  if (YY_START==ReadBody || 
+					      YY_START==ReadNSBody ||
+					      YY_START==ReadBodyIntf)
+					  {
+  					    current->program+=yytext;
+					  }
   					  BEGIN( PreLineCtrl );
   					}
 <PreLineCtrl>"\""[^\n\"]*"\""		{
@@ -4733,19 +4738,27 @@ TYPEDEFPREFIX (("typedef"{BN}+)?)((("volatile"|"const"){BN}+)?)
 					  BEGIN( ClassVar );
 					}
 <ClassVar>":"				{ 
-  					  current->type.resize(0);
-					  if ((current->spec & Entry::Interface) || 
-					      (current->spec & Entry::Struct)    || 
-					      (current->spec & Entry::Ref)       || 
-					      (current->spec & Entry::Value)     || 
-					      insidePHP || insideCS || insideD || insideObjC
-					     )
-					    baseProt=Public;
+					  if (current->section == Entry::VARIABLE_SEC) // enum a b:2, see bug 313527
+					  {
+  					    BEGIN(BitFields);
+					    current->bitfields+=":";
+					  }
 					  else
-					    baseProt=Private;
-                                          baseVirt=Normal;
-					  baseName.resize(0);
-					  BEGIN( BasesProt ) ;
+					  {
+					    current->type.resize(0);
+					    if ((current->spec & Entry::Interface) || 
+						(current->spec & Entry::Struct)    || 
+						(current->spec & Entry::Ref)       || 
+						(current->spec & Entry::Value)     || 
+						insidePHP || insideCS || insideD || insideObjC
+					       )
+					      baseProt=Public;
+					    else
+					      baseProt=Private;
+					    baseVirt=Normal;
+					    baseName.resize(0);
+					    BEGIN( BasesProt ) ;
+					  }
 					}
 <ClassVar>[;=*&]			{
     					  unput(*yytext);
@@ -5545,6 +5558,15 @@ static void handleCommentBlock(const QCString &doc,bool brief)
   if (docBlockInBody && hideInBodyDocs) return;
   //printf("parseCommentBlock [%s] brief=%d\n",doc.data(),brief);
   int lineNr = brief ? current->briefLine : current->docLine;   // line of block start
+  
+  // fill in inbodyFile && inbodyLine the first time, see bug 633891
+  Entry *docEntry = docBlockInBody && previous ? previous : current;
+  if (docBlockInBody && docEntry && docEntry->inbodyLine==-1)
+  {
+    docEntry->inbodyFile = yyFileName;
+    docEntry->inbodyLine = lineNr;
+  }
+
   while (parseCommentBlock(
 	g_thisParser,
 	docBlockInBody && previous ? previous : current,

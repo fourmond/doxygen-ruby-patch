@@ -179,6 +179,7 @@ void HtmlDocVisitor::visit(DocSymbol *s)
     case DocSymbol::Amp:     m_t << "&amp;"; break;
     case DocSymbol::Dollar:  m_t << "$"; break;
     case DocSymbol::Hash:    m_t << "#"; break;
+    case DocSymbol::DoubleColon: m_t << "::"; break;
     case DocSymbol::Percent: m_t << "%"; break;
     case DocSymbol::Copy:    m_t << "&copy;"; break;
     case DocSymbol::Tm:      m_t << "&trade;"; break;
@@ -304,7 +305,7 @@ void HtmlDocVisitor::visit(DocVerbatim *s)
   if (m_hide) return;
   switch(s->type())
   {
-    case DocVerbatim::Code: // fall though
+    case DocVerbatim::Code: 
       forceEndParagraph(s);
       m_t << PREFRAG_START;
       Doxygen::parserManager->getParser(m_langExt)
@@ -1634,11 +1635,14 @@ void HtmlDocVisitor::writeDotFile(const QCString &fn,const QCString &relPath,
   writeDotGraphFromFile(fn,outDir,baseName,BITMAP);
   QCString mapName = baseName+".map";
   QCString mapFile = fn+".map";
-  m_t << "<img src=\"" << relPath << baseName << "." 
-      << Config_getEnum("DOT_IMAGE_FORMAT") << "\" alt=\""
-      << baseName << "\" border=\"0\" usemap=\"#" << mapName << "\">" << endl;
-  QCString imap = getDotImageMapFromFile(fn,outDir,relPath,context);
-  m_t << "<map name=\"" << mapName << "\" id=\"" << mapName << "\">" << imap << "</map>" << endl;
+  //m_t << "<img src=\"" << relPath << baseName << "." 
+  //    << Config_getEnum("DOT_IMAGE_FORMAT") << "\" alt=\""
+  //    << baseName << "\" border=\"0\" usemap=\"#" << mapName << "\">" 
+  //    << endl;
+  //QCString imap = getDotImageMapFromFile(m_t,fn,baseName,outDir,relPath,context);
+  //m_t << "<map name=\"" << mapName << "\" id=\"" << mapName << "\">" 
+  //    << imap << "</map>" << endl;
+  writeDotImageMapFromFile(m_t,fn,outDir,relPath,context);
 }
 
 void HtmlDocVisitor::writeMscFile(const QCString &fileName,const QCString &relPath,

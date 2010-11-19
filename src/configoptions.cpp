@@ -607,6 +607,14 @@ void addConfigOptions(Config *cfg)
                 );
   //----
   cb = cfg->addBool(
+                 "STRICT_PROTO_MATCHING",
+                 "If the STRICT_PROTO_MATCHING option is enabled and doxygen fails to do proper type resolution of all parameters of a function it will reject a\n"
+                 "match between the prototype and the implementation of a member function even if there is only one candidate or it is obvious which candidate to choose by doing a simple string match. By disabling STRICT_PROTO_MATCHING doxygen\n"
+                 "will still accept a match between prototype and implementation in such cases.",
+                 FALSE
+                );
+  //----
+  cb = cfg->addBool(
                  "GENERATE_TODOLIST",
                  "The GENERATE_TODOLIST tag can be used to enable (YES) or\n"
                  "disable (NO) the todo list. This list is created by putting \\todo\n"
@@ -940,8 +948,8 @@ void addConfigOptions(Config *cfg)
                  "filter if there is a match.\n"
                  "The filters are a list of the form:\n"
                  "pattern=filter (like *.cpp=my_cpp_filter). See INPUT_FILTER for further\n"
-                 "info on how filters are used. If FILTER_PATTERNS is empty, INPUT_FILTER\n"
-                 "is applied to all files."
+                 "info on how filters are used. If FILTER_PATTERNS is empty or if\n"
+                 "non of the patterns match the file name, INPUT_FILTER is applied."
                 );
   cl->setWidgetType(ConfigList::File);
   //----
@@ -952,6 +960,17 @@ void addConfigOptions(Config *cfg)
                  "files to browse (i.e. when SOURCE_BROWSER is set to YES).",
                  FALSE
                 );
+  //----
+  cl = cfg->addList(
+                 "FILTER_SOURCE_PATTERNS",
+                 "The FILTER_SOURCE_PATTERNS tag can be used to specify source filters per file\n"
+                 "pattern. A pattern will override the setting for FILTER_PATTERN (if any)\n"
+                 "and it is also possible to disable source filtering for a specific pattern\n"
+                 "using *.ext= (so without naming a filter). This option only has effect when\n"
+                 "FILTER_SOURCE_FILES is enabled."
+                );
+  cl->addDependency("FILTER_SOURCE_FILES");
+  cl->setWidgetType(ConfigList::File);
   //---------------------------------------------------------------------------
   cfg->addInfo("Source Browser","configuration options related to source browsing");
   //---------------------------------------------------------------------------
@@ -1928,17 +1947,16 @@ void addConfigOptions(Config *cfg)
                  "If the MACRO_EXPANSION and EXPAND_ONLY_PREDEF tags are set to YES then\n"
                  "this tag can be used to specify a list of macro names that should be expanded.\n"
                  "The macro definition that is found in the sources will be used.\n"
-                 "Use the PREDEFINED tag if you want to use a different macro definition."
+                 "Use the PREDEFINED tag if you want to use a different macro definition that overrules the definition found in the source code."
                 );
   cl->addDependency("ENABLE_PREPROCESSING");
   //----
   cb = cfg->addBool(
                  "SKIP_FUNCTION_MACROS",
                  "If the SKIP_FUNCTION_MACROS tag is set to YES (the default) then\n"
-                 "doxygen's preprocessor will remove all function-like macros that are alone\n"
-                 "on a line, have an all uppercase name, and do not end with a semicolon. Such\n"
-                 "function macros are typically used for boiler-plate code, and will confuse\n"
-                 "the parser if not removed.",
+                 "doxygen's preprocessor will remove all references to function-like macros\n"
+                 "that are alone on a line, have an all uppercase name, and do not end with a\n"
+                 "semicolon, because these will confuse the parser if not removed.",
                  TRUE
                 );
   cb->addDependency("ENABLE_PREPROCESSING");
@@ -2052,16 +2070,15 @@ void addConfigOptions(Config *cfg)
   //----
   cs = cfg->addString(
                  "DOT_FONTNAME",
-                 "By default doxygen will write a font called FreeSans.ttf to the output\n"
-                 "directory and reference it in all dot files that doxygen generates. This\n"
-                 "font does not include all possible unicode characters however, so when you need\n"
-                 "these (or just want a differently looking font) you can specify the font name\n"
+                 "By default doxygen will write a font called Helvetica to the output\n"
+                 "directory and reference it in all dot files that doxygen generates.\n"
+                 "When you want a differently looking font you can specify the font name\n"
                  "using DOT_FONTNAME. You need need to make sure dot is able to find the font,\n"
                  "which can be done by putting it in a standard location or by setting the\n"
                  "DOTFONTPATH environment variable or by setting DOT_FONTPATH to the directory\n"
                  "containing the font."
                 );
-  cs->setDefaultValue("FreeSans.ttf");
+  cs->setDefaultValue("Helvetica");
   cs->addDependency("HAVE_DOT");
   //----
   ci = cfg->addInt(
@@ -2196,6 +2213,7 @@ void addConfigOptions(Config *cfg)
   ce->addValue("png");
   ce->addValue("jpg");
   ce->addValue("gif");
+  ce->addValue("svg");
   ce->addDependency("HAVE_DOT");
   //----
   cs = cfg->addString(

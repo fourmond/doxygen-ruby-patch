@@ -540,6 +540,7 @@ static void detectNoDocumentedParams()
         g_memberDef->hasDocumentedReturnType() ||
         returnType.isEmpty()         || // empty return type
         returnType.find("void")!=-1  || // void return type
+        returnType.find("subroutine")!=-1 || // fortran subroutine
         g_memberDef->isConstructor() || // a constructor
         g_memberDef->isDestructor()     // or destructor
        )
@@ -1008,7 +1009,7 @@ static void handleLinkedWord(DocNode *parent,QList<DocNode> &children)
   ClassDef *cd=0;
   bool ambig;
   FileDef *fd = findFileDef(Doxygen::inputNameDict,g_fileName,ambig);
-  //printf("handleLinkedWord(%s) g_context=%s\n",name.data(),g_context.data());
+  //printf("handleLinkedWord(%s) g_context=%s\n",g_token->name.data(),g_context.data());
   if (!g_insideHtmlLink && 
       (resolveRef(g_context,g_token->name,g_inSeeBlock,&compound,&member,TRUE,fd,TRUE)
        || (!g_context.isEmpty() &&  // also try with global scope
@@ -1104,11 +1105,15 @@ static void handleLinkedWord(DocNode *parent,QList<DocNode> &children)
   }
   else // normal non-linkable word
   {
-    if (g_token->name.left(1)=='#' || g_token->name.left(2)=="::")
+    if (g_token->name.left(1)=="#" || g_token->name.left(2)=="::")
     {
       warn_doc_error(g_fileName,doctokenizerYYlineno,"warning: explicit link request to '%s' could not be resolved",qPrint(name));
+      children.append(new DocWord(parent,g_token->name));
     }
-    children.append(new DocWord(parent,name));
+    else
+    {
+      children.append(new DocWord(parent,name));
+    }
   }
 }
 
@@ -1178,6 +1183,9 @@ reparsetoken:
           break;
         case CMD_HASH:
           children.append(new DocSymbol(parent,DocSymbol::Hash));
+          break;
+        case CMD_DCOLON:
+          children.append(new DocSymbol(parent,DocSymbol::DoubleColon));
           break;
         case CMD_PERCENT:
           children.append(new DocSymbol(parent,DocSymbol::Percent));
@@ -3018,6 +3026,7 @@ int DocIndexEntry::parse()
         case CMD_AMP:     m_entry+='&';  break;
         case CMD_DOLLAR:  m_entry+='$';  break;
         case CMD_HASH:    m_entry+='#';  break;
+        case CMD_DCOLON:  m_entry+="::"; break;
         case CMD_PERCENT: m_entry+='%';  break;
         case CMD_QUOTE:   m_entry+='"';  break;
         default:
@@ -4772,6 +4781,9 @@ int DocPara::handleCommand(const QCString &cmdName)
     case CMD_HASH:
       m_children.append(new DocSymbol(this,DocSymbol::Hash));
       break;
+    case CMD_DCOLON:
+      m_children.append(new DocSymbol(this,DocSymbol::DoubleColon));
+      break;
     case CMD_PERCENT:
       m_children.append(new DocSymbol(this,DocSymbol::Percent));
       break;
@@ -5662,6 +5674,7 @@ int DocPara::handleHtmlEndTag(const QCString &tagName)
     case XML_PARAM:
     case XML_TYPEPARAM:
     case XML_RETURNS:
+    case XML_SEE:
     case XML_SEEALSO:
     case XML_EXCEPTION:
       retval = RetVal_CloseXml;
@@ -6195,6 +6208,9 @@ void DocText::parse()
             break;
           case CMD_HASH:
             m_children.append(new DocSymbol(this,DocSymbol::Hash));
+            break;
+          case CMD_DCOLON:
+            m_children.append(new DocSymbol(this,DocSymbol::DoubleColon));
             break;
           case CMD_PERCENT:
             m_children.append(new DocSymbol(this,DocSymbol::Percent));
