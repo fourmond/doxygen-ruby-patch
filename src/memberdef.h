@@ -2,7 +2,7 @@
  *
  * 
  *
- * Copyright (C) 1997-2010 by Dimitri van Heesch.
+ * Copyright (C) 1997-2011 by Dimitri van Heesch.
  *
  * Permission to use, copy, modify, and distribute this software and its
  * documentation under the terms of the GNU General Public License is hereby 
@@ -330,6 +330,10 @@ class MemberDef : public Definition
     void copyArgumentNames(MemberDef *bmd);
 
     void setCategory(ClassDef *);
+
+    void setDocumentation(const char *d,const char *docFile,int docLine,bool stripWhiteSpace=TRUE);
+    void setBriefDescription(const char *b,const char *briefFile,int briefLine);
+    void setInbodyDocumentation(const char *d,const char *inbodyFile,int inbodyLine);
     
     //-----------------------------------------------------------------------------------
     // --- actions ----

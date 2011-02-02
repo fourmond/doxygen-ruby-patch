@@ -44,6 +44,22 @@ void addConfigOptions(Config *cfg)
                 );
   //----
   cs = cfg->addString(
+                 "PROJECT_BRIEF",
+                 "Using the PROJECT_BRIEF tag one can provide an optional one line description\n"
+                 "for a project that appears at the top of each page and should give viewer\n"
+                 "a quick idea about the purpose of the project. Keep the description short."
+                );
+  //----
+  cs = cfg->addString(
+                 "PROJECT_LOGO",
+                 "With the PROJECT_LOGO tag one can specify an logo or icon that is\n"
+                 "included in the documentation. The maximum height of the logo should not\n"
+                 "exceed 55 pixels and the maximum width should not exceed 200 pixels.\n"
+                 "Doxygen will copy the logo to the output directory."
+                );
+  cs->setWidgetType(ConfigString::File);
+  //----
+  cs = cfg->addString(
                  "OUTPUT_DIRECTORY",
                  "The OUTPUT_DIRECTORY tag is used to specify the (relative or absolute)\n"
                  "base path where the generated documentation will be put.\n"
@@ -73,7 +89,7 @@ void addConfigOptions(Config *cfg)
                  "Croatian, Czech, Danish, Dutch, Esperanto, Farsi, Finnish, French, German,\n"
                  "Greek, Hungarian, Italian, Japanese, Japanese-en (Japanese with English\n"
                  "messages), Korean, Korean-en, Lithuanian, Norwegian, Macedonian, Persian,\n"
-                 "Polish, Portuguese, Romanian, Russian, Serbian, Serbian-Cyrilic, Slovak,\n"
+                 "Polish, Portuguese, Romanian, Russian, Serbian, Serbian-Cyrillic, Slovak,\n"
                  "Slovene, Spanish, Swedish, Ukrainian, and Vietnamese.",
                  "English"
                 );
@@ -405,7 +421,7 @@ void addConfigOptions(Config *cfg)
                  "For small to medium size projects (<1000 input files) the default value is\n"
                  "probably good enough. For larger projects a too small cache size can cause\n"
                  "doxygen to be busy swapping symbols to and from disk most of the time\n"
-                 "causing a significant performance penality.\n"
+                 "causing a significant performance penalty.\n"
                  "If the system has enough physical memory increasing the cache will improve the\n"
                  "performance by keeping more symbols in memory. Note that the value works on\n"
                  "a logarithmic scale so increasing the size by one will roughly double the\n"
@@ -608,8 +624,11 @@ void addConfigOptions(Config *cfg)
   //----
   cb = cfg->addBool(
                  "STRICT_PROTO_MATCHING",
-                 "If the STRICT_PROTO_MATCHING option is enabled and doxygen fails to do proper type resolution of all parameters of a function it will reject a\n"
-                 "match between the prototype and the implementation of a member function even if there is only one candidate or it is obvious which candidate to choose by doing a simple string match. By disabling STRICT_PROTO_MATCHING doxygen\n"
+                 "If the STRICT_PROTO_MATCHING option is enabled and doxygen fails to\n"
+                 "do proper type resolution of all parameters of a function it will reject a\n"
+                 "match between the prototype and the implementation of a member function even\n"
+                 "if there is only one candidate or it is obvious which candidate to choose\n"
+                 "by doing a simple string match. By disabling STRICT_PROTO_MATCHING doxygen\n"
                  "will still accept a match between prototype and implementation in such cases.",
                  FALSE
                 );
@@ -817,7 +836,7 @@ void addConfigOptions(Config *cfg)
                  "blank the following patterns are tested:\n"
                  "*.c *.cc *.cxx *.cpp *.c++ *.d *.java *.ii *.ixx *.ipp *.i++ *.inl *.h *.hh\n"
                  "*.hxx *.hpp *.h++ *.idl *.odl *.cs *.php *.php3 *.inc *.m *.mm *.dox *.py\n"
-                 "*.f90 *.f *.vhd *.vhdl"
+                 "*.f90 *.f *.for *.vhd *.vhdl"
                 );
   cl->addValue("*.c");
   cl->addValue("*.cc");
@@ -848,6 +867,7 @@ void addConfigOptions(Config *cfg)
   cl->addValue("*.py");
   cl->addValue("*.f90");
   cl->addValue("*.f");
+  cl->addValue("*.for");
   cl->addValue("*.vhd");
   cl->addValue("*.vhdl");
   //----
@@ -870,7 +890,7 @@ void addConfigOptions(Config *cfg)
   cb = cfg->addBool(
                  "EXCLUDE_SYMLINKS",
                  "The EXCLUDE_SYMLINKS tag can be used select whether or not files or\n"
-                 "directories that are symbolic links (a Unix filesystem feature) are excluded\n"
+                 "directories that are symbolic links (a Unix file system feature) are excluded\n"
                  "from the input.",
                  FALSE
                 );
@@ -951,7 +971,6 @@ void addConfigOptions(Config *cfg)
                  "info on how filters are used. If FILTER_PATTERNS is empty or if\n"
                  "non of the patterns match the file name, INPUT_FILTER is applied."
                 );
-  cl->setWidgetType(ConfigList::File);
   //----
   cb = cfg->addBool(
                  "FILTER_SOURCE_FILES",
@@ -970,7 +989,6 @@ void addConfigOptions(Config *cfg)
                  "FILTER_SOURCE_FILES is enabled."
                 );
   cl->addDependency("FILTER_SOURCE_FILES");
-  cl->setWidgetType(ConfigList::File);
   //---------------------------------------------------------------------------
   cfg->addInfo("Source Browser","configuration options related to source browsing");
   //---------------------------------------------------------------------------
@@ -1107,7 +1125,13 @@ void addConfigOptions(Config *cfg)
                  "HTML_HEADER",
                  "The HTML_HEADER tag can be used to specify a personal HTML header for\n"
                  "each generated HTML page. If it is left blank doxygen will generate a\n"
-                 "standard header."
+                 "standard header. Note that when using a custom header you are responsible\n"
+                 "for the proper inclusion of any scripts and style sheets that doxygen\n"
+                 "needs, which is dependent on the configuration options used.\n"
+                 "It is adviced to generate a default header using \"doxygen -w html\n"
+                 "header.html footer.html stylesheet.css YourConfigFile\" and then modify\n"
+                 "that header. Note that the header is subject to change so you typically\n"
+                 "have to redo this when upgrading to a newer version of doxygen or when changing the value of configuration settings such as GENERATE_TREEVIEW!"
                 );
   cs->setWidgetType(ConfigString::File);
   cs->addDependency("GENERATE_HTML");
@@ -1419,9 +1443,10 @@ void addConfigOptions(Config *cfg)
   //----
   ci = cfg->addInt(
                  "ENUM_VALUES_PER_LINE",
-                 "This tag can be used to set the number of enum values (range [0,1..20])\n"
-                 "that doxygen will group on one line in the generated HTML documentation.\n"
-                 "Note that a value of 0 will completely suppress the enum values from appearing in the overview section.",
+                 "The ENUM_VALUES_PER_LINE tag can be used to set the number of enum values\n"
+                 "(range [0,1..20]) that doxygen will group on one line in the generated HTML\n"
+                 "documentation. Note that a value of 0 will completely suppress the enum\n"
+                 "values from appearing in the overview section.",
                  0,20,4
                 );
   ci->addDependency("GENERATE_HTML");
@@ -1503,7 +1528,8 @@ void addConfigOptions(Config *cfg)
                  "HTML output directory using the MATHJAX_RELPATH option. The destination\n"
                  "directory should contain the MathJax.js script. For instance, if the mathjax\n"
                  "directory is located at the same level as the HTML output directory, then\n"
-                 "MATHJAX_RELPATH should be ../mathjax. The default value points to the mathjax.org site, so you can quickly see the result without installing\n"
+                 "MATHJAX_RELPATH should be ../mathjax. The default value points to the\n"
+                 "mathjax.org site, so you can quickly see the result without installing\n"
                  "MathJax, but it is strongly recommended to install a local copy of MathJax\n"
                  "before deployment."
                 );
@@ -1907,7 +1933,7 @@ void addConfigOptions(Config *cfg)
   cb = cfg->addBool(
                  "SEARCH_INCLUDES",
                  "If the SEARCH_INCLUDES tag is set to YES (the default) the includes files\n"
-                 "in the INCLUDE_PATH (see below) will be search if a #include is found.",
+                 "pointed to by INCLUDE_PATH will be searched when a #include is found.",
                  TRUE
                 );
   cb->addDependency("ENABLE_PREPROCESSING");
@@ -1947,7 +1973,8 @@ void addConfigOptions(Config *cfg)
                  "If the MACRO_EXPANSION and EXPAND_ONLY_PREDEF tags are set to YES then\n"
                  "this tag can be used to specify a list of macro names that should be expanded.\n"
                  "The macro definition that is found in the sources will be used.\n"
-                 "Use the PREDEFINED tag if you want to use a different macro definition that overrules the definition found in the source code."
+                 "Use the PREDEFINED tag if you want to use a different macro definition that\n"
+                 "overrules the definition found in the source code."
                 );
   cl->addDependency("ENABLE_PREPROCESSING");
   //----
@@ -2073,7 +2100,7 @@ void addConfigOptions(Config *cfg)
                  "By default doxygen will write a font called Helvetica to the output\n"
                  "directory and reference it in all dot files that doxygen generates.\n"
                  "When you want a differently looking font you can specify the font name\n"
-                 "using DOT_FONTNAME. You need need to make sure dot is able to find the font,\n"
+                 "using DOT_FONTNAME. You need to make sure dot is able to find the font,\n"
                  "which can be done by putting it in a standard location or by setting the\n"
                  "DOTFONTPATH environment variable or by setting DOT_FONTPATH to the directory\n"
                  "containing the font."
@@ -2206,7 +2233,7 @@ void addConfigOptions(Config *cfg)
   ce = cfg->addEnum(
                  "DOT_IMAGE_FORMAT",
                  "The DOT_IMAGE_FORMAT tag can be used to set the image format of the images\n"
-                 "generated by dot. Possible values are png, jpg, or gif.\n"
+                 "generated by dot. Possible values are svg, png, jpg, or gif.\n"
                  "If left blank png will be used.",
                  "png"
                 );

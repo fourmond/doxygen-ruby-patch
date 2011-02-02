@@ -2,7 +2,7 @@
  *
  * 
  *
- * Copyright (C) 1997-2010 by Dimitri van Heesch.
+ * Copyright (C) 1997-2011 by Dimitri van Heesch.
  *
  * Permission to use, copy, modify, and distribute this software and its
  * documentation under the terms of the GNU General Public License is hereby 
@@ -161,11 +161,7 @@ void LatexGenerator::init()
 
   t << endl
     << "clean:" << endl
-#if defined(_MSC_VER)
-    << "\tdel "  
-#else
     << "\trm -f " 
-#endif
     << "*.ps *.dvi *.aux *.toc *.idx *.ind *.ilg *.log *.out refman.pdf" << endl;
 
   createSubDirs(d);
@@ -328,41 +324,41 @@ static void writeDefaultStyleSheetPart1(FTextStream &t)
        "\\RequirePackage{sectsty}\n"
        "\\RequirePackage{tocloft}\n"
        "\\allsectionsfont{\\usefont{OT1}{phv}{bc}{n}\\selectfont}\n"
-       "\\renewcommand{\\cftchapfont}{%\n"
+       "\\providecommand{\\cftchapfont}{%\n"
        "  \\fontsize{11}{13}\\usefont{OT1}{phv}{bc}{n}\\selectfont\n"
        "}\n"
-       "\\renewcommand{\\cftchappagefont}{%\n"
+       "\\providecommand{\\cftchappagefont}{%\n"
        "  \\fontsize{11}{13}\\usefont{OT1}{phv}{c}{n}\\selectfont\n"
        "}\n"
-       "\\renewcommand{\\cftsecfont}{%\n"
+       "\\providecommand{\\cftsecfont}{%\n"
        "  \\fontsize{10}{12}\\usefont{OT1}{phv}{c}{n}\\selectfont\n"
        "}\n"
-       "\\renewcommand{\\cftsecpagefont}{%\n"
+       "\\providecommand{\\cftsecpagefont}{%\n"
        "  \\fontsize{10}{12}\\usefont{OT1}{phv}{c}{n}\\selectfont\n"
        "}\n"
-       "\\renewcommand{\\cftsubsecfont}{%\n"
+       "\\providecommand{\\cftsubsecfont}{%\n"
        "  \\fontsize{10}{12}\\usefont{OT1}{phv}{c}{n}\\selectfont\n"
        "}\n"
-       "\\renewcommand{\\cftsubsecpagefont}{%\n"
+       "\\providecommand{\\cftsubsecpagefont}{%\n"
        "  \\fontsize{10}{12}\\usefont{OT1}{phv}{c}{n}\\selectfont\n"
        "}\n"
-       "\\renewcommand{\\cftsubsubsecfont}{%\n"
+       "\\providecommand{\\cftsubsubsecfont}{%\n"
        "  \\fontsize{9}{11}\\usefont{OT1}{phv}{c}{n}\\selectfont\n"
        "}\n"
-       "\\renewcommand{\\cftsubsubsecpagefont}{%\n"
+       "\\providecommand{\\cftsubsubsecpagefont}{%\n"
        "  \\fontsize{9}{11}\\usefont{OT1}{phv}{c}{n}\\selectfont\n"
        "}\n"
-       "\\renewcommand{\\cftparafont}{%\n"
+       "\\providecommand{\\cftparafont}{%\n"
        "  \\fontsize{9}{11}\\usefont{OT1}{phv}{c}{n}\\selectfont\n"
        "}\n"
-       "\\renewcommand{\\cftparapagefont}{%\n"
+       "\\providecommand{\\cftparapagefont}{%\n"
        "  \\fontsize{9}{11}\\usefont{OT1}{phv}{c}{n}\\selectfont\n"
        "}\n"
-       "\\renewcommand{\\cfttoctitlefont}{%\n"
+       "\\providecommand{\\cfttoctitlefont}{%\n"
        "  \\fontsize{20}{22}\\usefont{OT1}{phv}{b}{n}\\selectfont\n"
        "}\n"
-       "\\renewcommand{\\rmdefault}{phv}\n"
-       "\\renewcommand{\\bfdefault}{bc}\n"
+       "\\providecommand{\\rmdefault}{phv}\n"
+       "\\providecommand{\\bfdefault}{bc}\n"
        "\n\n";
 
   t << "% Setup fancy headings\n"
@@ -786,12 +782,12 @@ void LatexGenerator::writeStyleSheetFile(QFile &f)
   t << theTranslator->trGeneratedAt( dateToString(TRUE), projectName );
   t << " doxygen";
   //t << " " << theTranslator->trWrittenBy() << " ";
-  //t << "Dimitri van Heesch \\copyright~1997-2010";
+  //t << "Dimitri van Heesch \\copyright~1997-2011";
   writeDefaultStyleSheetPart2(t);
   t << theTranslator->trGeneratedAt( dateToString(TRUE), projectName );
   t << " doxygen";
   //t << " << theTranslator->trWrittenBy() << " ";
-  //t << "Dimitri van Heesch \\copyright~1997-2010";
+  //t << "Dimitri van Heesch \\copyright~1997-2011";
   writeDefaultStyleSheetPart3(t);
 }
 

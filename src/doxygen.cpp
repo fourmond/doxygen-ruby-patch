@@ -1,6 +1,6 @@
 /******************************************************************************
  *
- * Copyright (C) 1997-2010 by Dimitri van Heesch.
+ * Copyright (C) 1997-2011 by Dimitri van Heesch.
  *
  * Permission to use, copy, modify, and distribute this software and its
  * documentation under the terms of the GNU General Public License is hereby 
@@ -673,6 +673,7 @@ static void buildFileList(EntryNav *rootNav)
           if (!g->groupname.isEmpty() && (gd=Doxygen::groupSDict->find(g->groupname)))
           {
             gd->addFile(fd);
+            fd->makePartOfGroup(gd);
             //printf("File %s: in group %s\n",fd->name().data(),s->data());
           }
         }
@@ -8555,34 +8556,66 @@ static void readTagFile(Entry *root,const char *tl)
 }
 
 //----------------------------------------------------------------------------
+static void copyFile(const QCString &src,const QCString &dest)
+{
+  QFile sf(src);
+  if (sf.open(IO_ReadOnly))
+  {
+    QFileInfo fi(src);
+    QFile df(dest);
+    if (df.open(IO_WriteOnly))
+    {
+      char *buffer = new char[fi.size()];
+      sf.readBlock(buffer,fi.size());
+      df.writeBlock(buffer,fi.size());
+      df.flush();
+      delete[] buffer;
+    }
+    else
+    {
+      err("error: could not write to file %s\n",dest.data());
+    }
+  }
+  else
+  {
+    err("error: could not open user specified file %s\n",src.data());
+  }
+}
+
 static void copyStyleSheet()
 {
   QCString &htmlStyleSheet = Config_getString("HTML_STYLESHEET");
   if (!htmlStyleSheet.isEmpty())
   {
-    QFile cssf(htmlStyleSheet);
-    QFileInfo cssfi(htmlStyleSheet);
-    if (cssf.open(IO_ReadOnly))
+    QFileInfo fi(htmlStyleSheet);
+    if (!fi.exists())
     {
-      QCString destFileName = Config_getString("HTML_OUTPUT")+"/"+cssfi.fileName().data();
-      QFile df(destFileName);
-      if (df.open(IO_WriteOnly))
-      {
-        char *buffer = new char[cssf.size()];
-        cssf.readBlock(buffer,cssf.size());
-        df.writeBlock(buffer,cssf.size());
-        df.flush();
-        delete[] buffer;
-      }
-      else
-      {
-        err("error: could not write to style sheet %s\n",destFileName.data());
-      }
+      err("Style sheet '%s' specified by HTML_STYLESHEET does not exist!\n",htmlStyleSheet.data());
+      htmlStyleSheet.resize(0); // revert to the default
     }
     else
     {
-      err("error: could not open user specified style sheet %s\n",Config_getString("HTML_STYLESHEET").data());
-      htmlStyleSheet.resize(0); // revert to the default
+      QCString destFileName = Config_getString("HTML_OUTPUT")+"/"+fi.fileName().data();
+      copyFile(htmlStyleSheet,destFileName);
+    }
+  }
+}
+
+static void copyLogo()
+{
+  QCString &projectLogo = Config_getString("PROJECT_LOGO");
+  if (!projectLogo.isEmpty())
+  {
+    QFileInfo fi(projectLogo);
+    if (!fi.exists())
+    {
+      err("Project logo '%s' specified by PROJECT_LOGO does not exist!\n",projectLogo.data());
+      projectLogo.resize(0); // revert to the default
+    }
+    else
+    {
+      QCString destFileName = Config_getString("HTML_OUTPUT")+"/"+fi.fileName().data();
+      copyFile(projectLogo,destFileName);
     }
   }
 }
@@ -9102,7 +9135,7 @@ void dumpConfigAsXML()
 
 static void usage(const char *name)
 {
-  msg("Doxygen version %s\nCopyright Dimitri van Heesch 1997-2010\n\n",versionString);
+  msg("Doxygen version %s\nCopyright Dimitri van Heesch 1997-2011\n\n",versionString);
   msg("You can use doxygen in a number of ways:\n\n");
   msg("1) Use doxygen to generate a template configuration file:\n");
   msg("    %s [-s] -g [configName]\n\n",name);
@@ -9362,9 +9395,10 @@ void readConfiguration(int argc, char **argv)
         }
         else if (stricmp(formatName,"html")==0)
         {
-          if (optind+4<argc)
+          if (optind+4<argc || QFileInfo("Doxyfile").exists())
           {
-            if (!Config::instance()->parse(argv[optind+4]))
+            QCString df = optind+4<argc ? argv[optind+4] : QCString("Doxyfile");
+            if (!Config::instance()->parse(df))
             {
               err("error opening or reading configuration file %s!\n",argv[optind+4]);
               cleanUpDoxygen();
@@ -9372,6 +9406,10 @@ void readConfiguration(int argc, char **argv)
             }
             Config::instance()->substituteEnvironmentVars();
             Config::instance()->convertStrToVal();
+            // avoid bootstrapping issues when the config file already
+            // refers to the files that we are supposed to parse.
+            Config_getString("HTML_HEADER")="";
+            Config_getString("HTML_FOOTER")="";
             Config::instance()->check();
           }
           else
@@ -9420,6 +9458,7 @@ void readConfiguration(int argc, char **argv)
             }
             Config::instance()->substituteEnvironmentVars();
             Config::instance()->convertStrToVal();
+            Config_getString("LATEX_HEADER")="";
             Config::instance()->check();
           }
           else // use default config
@@ -10342,6 +10381,7 @@ void generateOutput()
 #endif
     //if (Config_getBool("HTML_DYNAMIC_SECTIONS")) HtmlGenerator::generateSectionImages();
     copyStyleSheet();
+    copyLogo();
     if (!generateTreeView && Config_getBool("USE_INLINE_TREES"))
     {
       FTVHelp::generateTreeViewImages();

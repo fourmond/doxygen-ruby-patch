@@ -30,6 +30,7 @@ Maximiliano Pin: max dot pin at bitroit dot com
 Albert Mora: [unreachable] amora at iua dot upf dot es
 
 TranslatorChinese
+Lang Yang: lian dot yang dot cn at gmail dot com
 Li Daobing: lidaobing at gmail dot com
 Wei Liu: liuwei at asiainfo dot com
 
@@ -44,6 +45,7 @@ TranslatorCzech
 Petr Přikryl: prikrylp at skil dot cz
 
 TranslatorDanish
+Poul-Erik Hansen: pouhan at gnotometrics dot dk
 Erik Søe Sørensen: eriksoe+doxygen at daimi dot au dot dk
 
 TranslatorDutch 

@@ -2,7 +2,7 @@
  *
  * 
  *
- * Copyright (C) 1997-2010 by Dimitri van Heesch.
+ * Copyright (C) 1997-2011 by Dimitri van Heesch.
  *
  * Permission to use, copy, modify, and distribute this software and its
  * documentation under the terms of the GNU General Public License is hereby 
@@ -143,7 +143,6 @@ static bool writeDefArgumentList(OutputList &ol,ClassDef *cd,
   }
   //printf("~~~ %s cName=%s\n",md->name().data(),cName.data());
 
-  //if (!md->isDefine()) ol.startParameter(TRUE); else ol.docify(" ");
   bool first=TRUE;
   bool paramTypeStarted=FALSE;
   bool isDefine = md->isDefine();
@@ -165,10 +164,6 @@ static bool writeDefArgumentList(OutputList &ol,ClassDef *cd,
 
     // use the following to put the function pointer type before the name
     bool hasFuncPtrType=FALSE; 
-
-    // or use the following to put the function pointer as it appears in
-    // the prototype.
-    //bool hasFuncPtrType=vp!=-1 && wp!=-1 && wp<vp; 
 
     if (!a->attrib.isEmpty() && !md->isObjCMethod()) // argument has an IDL attribute
     {
@@ -208,10 +203,10 @@ static bool writeDefArgumentList(OutputList &ol,ClassDef *cd,
     }
     if (!a->name.isEmpty() || (a->name.isEmpty() && a->type=="...")) // argument has a name
     { 
-      if (!hasFuncPtrType)
-      {
-        ol.docify(" ");
-      }
+      //if (!hasFuncPtrType)
+      //{
+      //  ol.docify(" ");
+      //}
       ol.disable(OutputGenerator::Man);
       ol.disable(OutputGenerator::Latex);
       ol.startEmphasis();
@@ -277,21 +272,12 @@ static bool writeDefArgumentList(OutputList &ol,ClassDef *cd,
   ol.pushGeneratorState();
   ol.disable(OutputGenerator::Html);
   ol.disable(OutputGenerator::Latex);
-  //if (!first) ol.writeString("&#160;");
   if (!md->isObjCMethod()) ol.docify(")"); // end argument list
   ol.enableAll();
   if (htmlOn) ol.enable(OutputGenerator::Html);
   if (latexOn) ol.enable(OutputGenerator::Latex);
-  //if (!isDefine) 
-  {
-    if (first) ol.startParameterName(defArgList->count()<2);
-    ol.endParameterName(TRUE,defArgList->count()<2,!md->isObjCMethod());
-  }
-  //else // isDefine
-  //{
-  //  if (first) ol.startParameterName(TRUE);
-  //  ol.endParameterName(TRUE,defArgList->count()<2,!md->isObjCMethod());
-  //}
+  if (first) ol.startParameterName(defArgList->count()<2);
+  ol.endParameterName(TRUE,defArgList->count()<2,!md->isObjCMethod());
   ol.popGeneratorState();
   if (md->extraTypeChars())
   {
@@ -935,6 +921,27 @@ void MemberDef::_computeLinkableInProject()
   }
   //printf("linkable!\n");
   return; // linkable!
+}
+
+void MemberDef::setDocumentation(const char *d,const char *docFile,int docLine,bool stripWhiteSpace)
+{
+  makeResident();
+  Definition::setDocumentation(d,docFile,docLine,stripWhiteSpace);
+  m_isLinkableCached = 0;
+}
+
+void MemberDef::setBriefDescription(const char *b,const char *briefFile,int briefLine)
+{
+  makeResident();
+  Definition::setBriefDescription(b,briefFile,briefLine);
+  m_isLinkableCached = 0;
+}
+
+void MemberDef::setInbodyDocumentation(const char *d,const char *inbodyFile,int inbodyLine)
+{
+  makeResident();
+  Definition::setInbodyDocumentation(d,inbodyFile,inbodyLine);
+  m_isLinkableCached = 0;
 }
 
 bool MemberDef::isLinkableInProject() const
@@ -2109,7 +2116,7 @@ void MemberDef::writeDocumentation(MemberList *ml,OutputList &ol,
       MemberDef *fmd=fmdl->first();
       while (fmd)
       {
-        //printf("Enum: isLinkable()=%d\n",fmd->isLinkable());
+        //printf("Enum %p: isLinkable()=%d\n",fmd,fmd->isLinkable());
         if (fmd->isLinkable())
         {
           if (first)

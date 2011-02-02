@@ -2,7 +2,7 @@
  *
  * 
  *
- * Copyright (C) 1997-2010 by Dimitri van Heesch.
+ * Copyright (C) 1997-2011 by Dimitri van Heesch.
  *
  * Permission to use, copy, modify, and distribute this software and its
  * documentation under the terms of the GNU General Public License is hereby 
@@ -379,6 +379,17 @@ void replaceComment(int offset);
 				       BEGIN(CComment);
 				     }
   				   }
+<Scan>"!>"			   {
+                                     if (g_lang!=SrcLangExt_F90)
+				     {
+				       REJECT;
+				     }
+				     else
+				     {
+                                       copyToOutput(yytext,yyleng); 
+				       BEGIN(CComment);
+				     }
+  				   }
 <CComment>"{@code"/[ \t\n]	   {
                                      copyToOutput("@code",5); 
 				     g_lastCommentContext = YY_START;
@@ -664,7 +675,8 @@ void replaceComment(int offset);
     			             {
 				       //printf("** Adding start of comment!\n");
 				       if (g_lang!=SrcLangExt_Python &&
-					   g_lang!=SrcLangExt_VHDL)
+					   g_lang!=SrcLangExt_VHDL &&
+					   g_lang!=SrcLangExt_F90)
 				       {
  				         ADDCHAR('/');
      				         ADDCHAR('*');
@@ -682,7 +694,8 @@ void replaceComment(int offset);
     			             {
 				       //printf("** Adding terminator for comment!\n");
 				       if (g_lang!=SrcLangExt_Python &&
-					   g_lang!=SrcLangExt_VHDL)
+					   g_lang!=SrcLangExt_VHDL &&
+					   g_lang!=SrcLangExt_F90)
 				       {
  				         ADDCHAR('*');
      				         ADDCHAR('/');

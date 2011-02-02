@@ -3,7 +3,7 @@
  * 
  *
  *
- * Copyright (C) 1997-2010 by Dimitri van Heesch.
+ * Copyright (C) 1997-2011 by Dimitri van Heesch.
  *
  * Permission to use, copy, modify, and distribute this software and its
  * documentation under the terms of the GNU General Public License is hereby 
@@ -343,7 +343,8 @@ HTMLKEYL  "strong"|"center"|"table"|"caption"|"small"|"code"|"dfn"|"var"|"img"|"
 HTMLKEYU  "STRONG"|"CENTER"|"TABLE"|"CAPTION"|"SMALL"|"CODE"|"DFN"|"VAR"|"IMG"|"PRE"|"SUB"|"SUP"|"TR"|"TD"|"TH"|"OL"|"UL"|"LI"|"TT"|"KBD"|"EM"|"HR"|"DL"|"DT"|"DD"|"BR"|"I"|"A"|"B"|"P"
 HTMLKEYW  {HTMLKEYL}|{HTMLKEYU}
 REFWORD2  ("#"|"::")?({ID}{TEMPLPART}?("."|"#"|"::"|"-"|"/"))*({ID}(":")?){FUNCARG}?
-REFWORD   {LABELID}|{REFWORD2}
+REFWORD3  ({ID}":")*{ID}":"?
+REFWORD   {LABELID}|{REFWORD2}|{REFWORD3}
 
 %option noyywrap
 %option yylineno

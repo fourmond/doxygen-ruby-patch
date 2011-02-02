@@ -2,7 +2,7 @@
  *
  * 
  *
- * Copyright (C) 1997-2010 by Parker Waechter & Dimitri van Heesch.
+ * Copyright (C) 1997-2011 by Parker Waechter & Dimitri van Heesch.
  *
  * Permission to use, copy, modify, and distribute this software and its
  * documentation under the terms of the GNU General Public License is hereby 
@@ -173,6 +173,8 @@ class RTFGenerator : public OutputGenerator
     void endPageRef(const char *,const char *);
     void startQuickIndices() {}
     void endQuickIndices() {}
+    void writeSplitBar(const char *) {}
+    void writeLogo() {}
     void writeQuickLinks(bool,HighlightedItem) {}
     void startContents() {}
     void endContents() {}

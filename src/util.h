@@ -2,7 +2,7 @@
  *
  * 
  *
- * Copyright (C) 1997-2010 by Dimitri van Heesch.
+ * Copyright (C) 1997-2011 by Dimitri van Heesch.
  *
  * Permission to use, copy, modify, and distribute this software and its
  * documentation under the terms of the GNU General Public License is hereby 
@@ -155,8 +155,8 @@ bool resolveLink(/* in */  const char *scName,
                  /* out */ QCString &resAnchor
                 );
 
-bool generateRef(OutputDocInterface &od,const char *,
-                        const char *,bool inSeeBlock,const char * =0);
+//bool generateRef(OutputDocInterface &od,const char *,
+//                        const char *,bool inSeeBlock,const char * =0);
 
 bool generateLink(OutputDocInterface &od,const char *,
                          const char *,bool inSeeBlock,const char *);
@@ -382,6 +382,18 @@ void writeSummaryLink(OutputList &ol,const char *label,const char *title,
 QCString externalLinkTarget();
 QCString externalRef(const QCString &relPath,const QCString &ref,bool href);
 int nextUtf8CharPosition(const QCString &utf8Str,int len,int startPos);
+
+struct ColoredImgDataItem
+{
+  const char *name;
+  unsigned short width;
+  unsigned short height;
+  unsigned char *content;
+  unsigned char *alpha;
+};
+
+void writeColoredImgData(const char *dir,ColoredImgDataItem data[]);
+QCString replaceColorMarkers(const char *str);
 
 #endif
 

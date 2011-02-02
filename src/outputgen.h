@@ -2,7 +2,7 @@
  *
  * 
  *
- * Copyright (C) 1997-2010 by Dimitri van Heesch.
+ * Copyright (C) 1997-2011 by Dimitri van Heesch.
  *
  * Permission to use, copy, modify, and distribute this software and its
  * documentation under the terms of the GNU General Public License is hereby 
@@ -379,6 +379,8 @@ class OutputGenerator : public BaseOutputDocInterface
     virtual void writeGraphicalHierarchy(const DotGfxHierarchyTable &g) = 0;
     virtual void startQuickIndices() = 0;
     virtual void endQuickIndices() = 0;
+    virtual void writeSplitBar(const char *) = 0;
+    virtual void writeLogo() = 0;
     virtual void writeQuickLinks(bool compact,HighlightedItem hli) = 0;
     virtual void startContents() = 0;
     virtual void endContents() = 0;

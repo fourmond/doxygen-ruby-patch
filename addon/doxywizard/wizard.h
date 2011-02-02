@@ -2,7 +2,7 @@
  *
  * 
  *
- * Copyright (C) 1997-2007 by Dimitri van Heesch.
+ * Copyright (C) 1997-2011 by Dimitri van Heesch.
  *
  * Permission to use, copy, modify, and distribute this software and its
  * documentation under the terms of the GNU General Public License is hereby 
@@ -17,6 +17,7 @@
 
 #include <QSplitter>
 #include <QHash>
+#include <QDialog>
 
 class Input;
 class QTreeWidget;
@@ -29,11 +30,75 @@ class QRadioButton;
 class QGroupBox;
 class QButtonGroup;
 class Wizard;
+class QImage;
+class QLabel;
 
 enum OptLang     { Lang_Cpp, Lang_C, Lang_Java, Lang_CS };
 enum HtmlStyle   { HS_Plain, HS_TreeView, HS_CHM };
 enum TexStyle    { TS_PDFHyper, TS_PDF, TS_PS };
 enum DiagramMode { DM_None, DM_Builtin, DM_Dot };
+
+class TuneColorDialog : public QDialog
+{
+    Q_OBJECT
+
+  public:
+    TuneColorDialog(int hue,int sat,int gamma,QWidget *parent=0);
+    int getHue() const;
+    int getSaturation() const;
+    int getGamma() const;
+
+  private slots:
+    void updateImage(int hue,int sat,int val);
+
+  private:
+    QImage *m_image;
+    QLabel *m_imageLab;
+    int m_hue;
+    int m_sat;
+    int m_gam;
+};
+
+class ColorPicker : public QWidget
+{
+    Q_OBJECT
+public:
+    enum Mode { Hue, Saturation, Gamma };
+    ColorPicker(Mode m);
+    ~ColorPicker();
+
+public slots:
+    void setCol(int h, int s, int g);
+    //void setCol(int h, int s);
+
+signals:
+    void newHsv(int h, int s, int g);
+
+protected:
+    void paintEvent(QPaintEvent*);
+    void mouseMoveEvent(QMouseEvent *);
+    void mousePressEvent(QMouseEvent *);
+
+private:
+    enum { foff = 3, coff = 4 }; //frame and contents offset
+    int y2hue(int y);
+    int y2sat(int y);
+    int y2gam(int y);
+    int hue2y(int hue);
+    int sat2y(int sat);
+    int gam2y(int gamma);
+    void setHue(int v);
+    void setSat(int v);
+    void setGam(int v);
+
+    QPixmap *m_pix;
+    Mode m_mode;
+    int m_gam;
+    int m_hue;
+    int m_sat;
+
+};
+
 
 class Step1 : public QWidget
 {
@@ -46,7 +111,9 @@ class Step1 : public QWidget
   private slots:
     void selectSourceDir(); 
     void selectDestinationDir(); 
+    void selectProjectIcon();
     void setProjectName(const QString &name);
+    void setProjectBrief(const QString &desc);
     void setProjectNumber(const QString &num);
     void setSourceDir(const QString &dir);
     void setDestinationDir(const QString &dir);
@@ -54,9 +121,11 @@ class Step1 : public QWidget
 
   private:
     QLineEdit *m_projName;
+    QLineEdit *m_projBrief;
     QLineEdit *m_projNumber;
     QLineEdit *m_sourceDir;
     QLineEdit *m_destDir;
+    QLabel    *m_projIconLab;
     QCheckBox *m_recursive;
     QPushButton *m_srcSelectDir;
     QPushButton *m_dstSelectDir;
@@ -103,6 +172,7 @@ class Step3 : public QWidget
     void setSearchEnabled(int);
     void setHtmlOptions(int);
     void setLatexOptions(int);
+    void tuneColorDialog();
 
   private:
     QGroupBox *m_texOptions;
@@ -115,6 +185,7 @@ class Step3 : public QWidget
     QCheckBox *m_rtfEnabled;
     QCheckBox *m_xmlEnabled;
     QCheckBox *m_searchEnabled;
+    QPushButton *m_tuneColor;
     Wizard    *m_wizard;
     const QHash<QString,Input *> &m_modelData;
 };

@@ -2,7 +2,7 @@
  *
  * 
  *
- * Copyright (C) 1997-2010 by Dimitri van Heesch.
+ * Copyright (C) 1997-2011 by Dimitri van Heesch.
  *
  * Permission to use, copy, modify, and distribute this software and its
  * documentation under the terms of the GNU General Public License is hereby 
@@ -328,6 +328,10 @@ class OutputList : public OutputDocInterface
     { forall(&OutputGenerator::startQuickIndices); }
     void endQuickIndices()
     { forall(&OutputGenerator::endQuickIndices); }
+    void writeSplitBar(const char *name)
+    { forall(&OutputGenerator::writeSplitBar,name); }
+    void writeLogo()
+    { forall(&OutputGenerator::writeLogo); }
     void writeQuickLinks(bool compact,HighlightedItem hli)
     { forall(&OutputGenerator::writeQuickLinks,compact,hli); }
     void startContents()
