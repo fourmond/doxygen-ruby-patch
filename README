@@ -13,7 +13,7 @@ Report any Ruby-related problem using the trackers at github:
 https://github.com/fourmond/doxygen-ruby-patch/issues
 
 
-DOXYGEN Version 1.7.3_20110123
+DOXYGEN Version 1.7.3_20110217
 
 Please read INSTALL for compilation instructions.
 
@@ -41,4 +41,4 @@ forum.
 
 Enjoy,
 
-Dimitri van Heesch (dimitri@stack.nl) (23 January 2011)
+Dimitri van Heesch (dimitri@stack.nl) (17 February 2011)
