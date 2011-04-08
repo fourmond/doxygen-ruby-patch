@@ -1,14 +1,13 @@
 h1. Doxygen with Ruby support
 
-This is a fork of doxygen that provides Ruby support. The extra code
-was written by Vincent Fourmond <vincent.fourmond@9online.fr>. Apart
-from that, it behaves exactly like a normal doxygen (with respect to
-the installation instructions, for instance).
+This is a fork of doxygen that provides Ruby support. The extra code was written by Vincent Fourmond <vincent.fourmond@9online.fr>. Apart from that, it behaves exactly like a normal doxygen (with respect to the installation instructions, for instance).
 
 This fork exists solely for testing purposes; when the code is mature
 enough, my hope is that it will integrate mainstream Doxygen.
 
-Report any Ruby-related problem using the trackers at github:
+Report any Ruby-related problem using the 
+"trackers":https://github.com/fourmond/doxygen-ruby-patch/issues at 
+"github":https://github.com/fourmond/doxygen-ruby-patch
 
-https://github.com/fourmond/doxygen-ruby-patch/issues
+
 
